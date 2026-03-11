@@ -104,7 +104,7 @@ export const GridCell: React.FC<GridCellProps> = ({
               alignItems: 'center',
               justifyContent: 'center',
               color: COLORS.white,
-              fontSize: '1.2em',
+              fontSize: '2.4em',
               fontWeight: 'bold',
               textShadow: '1px 1px 2px rgba(0,0,0,0.8)',
               zIndex: 1,

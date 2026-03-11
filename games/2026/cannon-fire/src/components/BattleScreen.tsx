@@ -63,7 +63,7 @@ export const BattleScreen: React.FC<BattleScreenProps> = ({ state, dispatch }) =
       <div
         style={{
           fontFamily: FONTS.body,
-          fontSize: 'clamp(14px, 3.5vw, 18px)',
+          fontSize: 'clamp(28px, 7vw, 36px)',
           color: state.isComputerThinking ? COLORS.lightGold : COLORS.parchment,
           textAlign: 'center',
           padding: '6px 16px',
@@ -101,7 +101,7 @@ export const BattleScreen: React.FC<BattleScreenProps> = ({ state, dispatch }) =
             <span
               style={{
                 fontFamily: FONTS.body,
-                fontSize: '11px',
+                fontSize: '22px',
                 color: ship.sunk ? COLORS.hit : COLORS.lightParchment,
                 textDecoration: ship.sunk ? 'line-through' : 'none',
               }}
@@ -141,7 +141,7 @@ export const BattleScreen: React.FC<BattleScreenProps> = ({ state, dispatch }) =
           style={{
             textAlign: 'center',
             fontFamily: FONTS.heading,
-            fontSize: '14px',
+            fontSize: '28px',
             color: COLORS.gold,
             marginBottom: '4px',
             letterSpacing: '1px',
@@ -209,7 +209,7 @@ export const BattleScreen: React.FC<BattleScreenProps> = ({ state, dispatch }) =
         >
           <span
             style={{
-              fontSize: '10px',
+              fontSize: '20px',
               color: COLORS.lightGold,
               fontFamily: "'Georgia', serif",
               textTransform: 'uppercase',
@@ -231,7 +231,7 @@ export const BattleScreen: React.FC<BattleScreenProps> = ({ state, dispatch }) =
               <span
                 style={{
                   fontFamily: FONTS.body,
-                  fontSize: '11px',
+                  fontSize: '22px',
                   color: ship.sunk ? COLORS.hit : COLORS.lightParchment,
                   textDecoration: ship.sunk ? 'line-through' : 'none',
                   minWidth: '50px',

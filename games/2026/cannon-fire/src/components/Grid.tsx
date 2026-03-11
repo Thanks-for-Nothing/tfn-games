@@ -25,7 +25,7 @@ export const Grid: React.FC<GridProps> = ({
     justifyContent: 'center',
     color: COLORS.gold,
     fontFamily: FONTS.label,
-    fontSize: '12px',
+    fontSize: '24px',
     fontWeight: 'bold',
     textShadow: '1px 1px 2px rgba(0,0,0,0.5)',
     userSelect: 'none',

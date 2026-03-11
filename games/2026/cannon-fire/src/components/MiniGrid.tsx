@@ -30,7 +30,7 @@ export const MiniGrid: React.FC<MiniGridProps> = ({ board, showShips, onTap, lab
     >
       <span
         style={{
-          fontSize: '10px',
+          fontSize: '20px',
           color: COLORS.lightGold,
           fontFamily: "'Georgia', serif",
           textTransform: 'uppercase',
@@ -76,7 +76,7 @@ export const MiniGrid: React.FC<MiniGridProps> = ({ board, showShips, onTap, lab
 
       <span
         style={{
-          fontSize: '9px',
+          fontSize: '18px',
           color: COLORS.lightParchment,
           opacity: 0.6,
           fontStyle: 'italic',

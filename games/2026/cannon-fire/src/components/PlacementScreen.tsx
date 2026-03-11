@@ -78,7 +78,7 @@ export const PlacementScreen: React.FC<PlacementScreenProps> = ({ state, dispatc
       <h2
         style={{
           fontFamily: FONTS.heading,
-          fontSize: 'clamp(20px, 5vw, 28px)',
+          fontSize: 'clamp(40px, 10vw, 56px)',
           color: COLORS.parchment,
           textShadow: '1px 1px 3px rgba(0,0,0,0.5)',
           marginBottom: '4px',
@@ -91,7 +91,7 @@ export const PlacementScreen: React.FC<PlacementScreenProps> = ({ state, dispatc
       <p
         style={{
           fontFamily: FONTS.body,
-          fontSize: '12px',
+          fontSize: '24px',
           color: COLORS.lightGold,
           marginBottom: '12px',
           textAlign: 'center',

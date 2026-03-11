@@ -39,7 +39,7 @@ export const DefeatScreen: React.FC = () => {
       <h1
         style={{
           fontFamily: FONTS.heading,
-          fontSize: 'clamp(24px, 7vw, 36px)',
+          fontSize: 'clamp(48px, 14vw, 72px)',
           color: COLORS.hit,
           textShadow: `2px 2px 4px rgba(0,0,0,0.6), 0 0 20px rgba(204, 51, 0, 0.3)`,
           marginBottom: '24px',
@@ -54,7 +54,7 @@ export const DefeatScreen: React.FC = () => {
       <p
         style={{
           fontFamily: FONTS.body,
-          fontSize: 'clamp(14px, 3.5vw, 18px)',
+          fontSize: 'clamp(28px, 7vw, 36px)',
           color: COLORS.lightParchment,
           opacity: 0.7,
           maxWidth: '280px',
@@ -70,7 +70,7 @@ export const DefeatScreen: React.FC = () => {
       <p
         style={{
           fontFamily: FONTS.body,
-          fontSize: '14px',
+          fontSize: '28px',
           color: COLORS.lightParchment,
           opacity: 0.4,
           fontStyle: 'italic',

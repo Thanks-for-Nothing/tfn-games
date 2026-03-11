@@ -40,7 +40,7 @@ export const HoldingArea: React.FC<HoldingAreaProps> = ({
       <span
         style={{
           fontFamily: FONTS.body,
-          fontSize: '13px',
+          fontSize: '26px',
           color: COLORS.lightGold,
           fontStyle: 'italic',
         }}

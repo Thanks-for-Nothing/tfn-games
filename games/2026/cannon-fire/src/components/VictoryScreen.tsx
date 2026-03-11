@@ -19,7 +19,7 @@ export const VictoryScreen: React.FC = () => {
       {/* Victory icon */}
       <div
         style={{
-          fontSize: '64px',
+          fontSize: '128px',
           marginBottom: '24px',
           animation: 'cannonfire-float 3s ease-in-out infinite',
         }}
@@ -38,7 +38,7 @@ export const VictoryScreen: React.FC = () => {
       <h1
         style={{
           fontFamily: FONTS.heading,
-          fontSize: 'clamp(32px, 9vw, 48px)',
+          fontSize: 'clamp(64px, 18vw, 96px)',
           color: COLORS.gold,
           textShadow: `2px 2px 4px rgba(0,0,0,0.6), 0 0 30px rgba(200, 168, 78, 0.4)`,
           marginBottom: '16px',
@@ -61,7 +61,7 @@ export const VictoryScreen: React.FC = () => {
         <p
           style={{
             fontFamily: FONTS.body,
-            fontSize: 'clamp(16px, 4vw, 20px)',
+            fontSize: 'clamp(32px, 8vw, 40px)',
             color: COLORS.parchment,
             lineHeight: 1.6,
             margin: 0,
@@ -73,7 +73,7 @@ export const VictoryScreen: React.FC = () => {
             style={{
               color: COLORS.gold,
               fontFamily: FONTS.heading,
-              fontSize: 'clamp(20px, 5vw, 26px)',
+              fontSize: 'clamp(40px, 10vw, 52px)',
             }}
           >
             Game Master
@@ -86,7 +86,7 @@ export const VictoryScreen: React.FC = () => {
       <p
         style={{
           fontFamily: FONTS.body,
-          fontSize: '14px',
+          fontSize: '28px',
           color: COLORS.lightParchment,
           opacity: 0.6,
           fontStyle: 'italic',

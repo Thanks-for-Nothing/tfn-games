@@ -47,7 +47,7 @@ export const Ship: React.FC<ShipProps> = ({
       <span
         style={{
           fontFamily: FONTS.body,
-          fontSize: '11px',
+          fontSize: '22px',
           color: COLORS.lightParchment,
           textAlign: 'center',
           opacity: 0.8,

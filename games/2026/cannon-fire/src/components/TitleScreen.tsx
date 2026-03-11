@@ -72,7 +72,7 @@ export const TitleScreen: React.FC<TitleScreenProps> = ({ onStart }) => {
           <p
             style={{
               fontFamily: FONTS.body,
-              fontSize: 'clamp(13px, 3vw, 16px)',
+              fontSize: 'clamp(26px, 6vw, 32px)',
               color: COLORS.parchment,
               textAlign: 'center',
               maxWidth: '280px',
