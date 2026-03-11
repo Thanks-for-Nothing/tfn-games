@@ -64,7 +64,28 @@ Once an event is over and a game is finalized:
 
 ## Adding a New Game
 
-### 1. Create the game folder
+Adding a new game folder alone is NOT enough — the game won't build or deploy until the root config files are updated. Here's everything that needs to happen:
+
+### Checklist
+
+> **Root files that MUST be updated (by a repo admin):**
+>
+> | File | What to add |
+> |------|-------------|
+> | `package.json` (root) | Build script for the new game + add it to `build:active` |
+> | `vercel.json` | SPA rewrite rule for the new game's URL path |
+> | `dist/index.html` | Link on the landing page (optional but recommended) |
+>
+> **Game files to create:**
+>
+> | File | What it does |
+> |------|--------------|
+> | `games/YEAR/game-name/` | The game's source code folder |
+> | `games/YEAR/game-name/vite.config.ts` | Must set `base` and `outDir` for subdirectory deployment |
+
+### Step-by-step
+
+#### 1. Create the game folder
 
 ```
 games/YEAR/game-name/
@@ -72,9 +93,9 @@ games/YEAR/game-name/
 
 The game can use any framework (React, vanilla JS, Svelte, etc.) as long as it has a `package.json` with a `build` script.
 
-### 2. Configure the build output path
+#### 2. Configure the build output path (in the game's vite.config.ts)
 
-For Vite games, update `vite.config.ts`:
+For Vite games, set `base` and `outDir` so assets load from the correct subdirectory:
 
 ```ts
 export default defineConfig({
@@ -87,10 +108,14 @@ export default defineConfig({
 })
 ```
 
-- `base` sets the URL prefix so asset paths work correctly
-- `outDir` points to the shared dist folder (path is relative to the game folder)
+- `base` — sets the URL prefix so asset paths resolve correctly (e.g., images, JS bundles)
+- `outDir` — tells Vite to output the build into the shared `dist/` folder (path is relative to the game folder)
 
-### 3. Add build scripts to root `package.json`
+**Important:** When referencing static assets in code, always use `` `${import.meta.env.BASE_URL}assets/filename` `` instead of `/assets/filename`. Hardcoded absolute paths will break because the game is served from a subdirectory, not the site root.
+
+#### 3. Add build scripts to root `package.json`
+
+Add two new lines and chain the new game into `build:active`:
 
 ```jsonc
 {
@@ -98,12 +123,12 @@ export default defineConfig({
     "build": "npm run build:active",
     "build:active": "npm run build:2026-cannon-fire && npm run build:YEAR-game-name",
     "build:YEAR-game-name": "cd games/YEAR/game-name && npm install && npm run build",
-    "freeze:YEAR-game-name": "cd games/YEAR/game-name && npm install && npm run build && echo 'Now commit dist/YEAR/game-name/ and remove from build:active'"
+    "freeze:YEAR-game-name": "cd games/YEAR/game-name && npm install && npm run build && echo 'Now commit dist/YEAR/game-name/ and remove this game from build:active'"
   }
 }
 ```
 
-### 4. Add a rewrite to `vercel.json`
+#### 4. Add a rewrite to `vercel.json`
 
 Each single-page app (SPA) needs a rewrite so that direct URL access and browser refresh work:
 
@@ -118,7 +143,7 @@ Each single-page app (SPA) needs a rewrite so that direct URL access and browser
 
 **Note:** Static/vanilla JS games that don't use client-side routing don't need a rewrite.
 
-### 5. Update the landing page
+#### 5. Update the landing page
 
 Add a link to `dist/index.html`:
 
@@ -126,9 +151,18 @@ Add a link to `dist/index.html`:
 <li><a href="/YEAR/game-name/">Game Name (YEAR)</a></li>
 ```
 
-### 6. Push to GitHub
+#### 6. Push to GitHub
 
-Vercel auto-deploys on push. Your game is live.
+Vercel auto-deploys on push. Your game will be live at `game.tfnparty.com/YEAR/game-name/` within ~30 seconds.
+
+### Example: adding a game called "fish-id" for 2026
+
+1. Create source folder at `games/2026/fish-id/`
+2. In the game's `vite.config.ts`, set `base: '/2026/fish-id/'` and `outDir: '../../../dist/2026/fish-id'`
+3. In root `package.json`, add `"build:2026-fish-id": "cd games/2026/fish-id && npm install && npm run build"` and chain it into `build:active`
+4. In `vercel.json`, add `{ "source": "/2026/fish-id/(.*)", "destination": "/2026/fish-id/index.html" }`
+5. In `dist/index.html`, add a link to `/2026/fish-id/`
+6. Push to `main`
 
 ---
 
