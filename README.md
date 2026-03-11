@@ -189,6 +189,8 @@ The following year folders already exist and are ready for games to be added:
 
 | Year | Folder | Status |
 |------|--------|--------|
+| 2024 | `games/2024/` | Empty (ready for games) |
+| 2025 | `games/2025/` | Empty (ready for games) |
 | 2026 | `games/2026/` | Active |
 | 2027 | `games/2027/` | Empty (ready for games) |
 
