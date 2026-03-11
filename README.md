@@ -2,7 +2,7 @@
 
 All interactive games for **Thanks for Nothing** events, hosted under a single domain.
 
-**Live at:** `game.tfnparty.com` (or your Vercel project URL)
+**Live at:** `game.tfnparty.com`
 
 ---
 
