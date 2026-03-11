@@ -263,7 +263,23 @@ To embed a game on your Framer site, add an **Embed** element with this iframe:
 **Tips:**
 - Set the Embed element to fill the section (100% width, fixed height like 700px or 100vh)
 - Add `allow="autoplay; vibrate"` for games with sound/haptic effects
-- You can also link directly to `game.tfnparty.com/2026/cannon-fire/` instead of embedding
+
+### Option 2: Link directly
+
+Instead of embedding, you can link to the game URL from a button or text link in Framer:
+
+```
+https://game.tfnparty.com/2026/cannon-fire/
+```
+
+This navigates the user away from tfnparty.com to the game on its own page. Better for mobile (full-screen experience) but the user leaves your site.
+
+### Which to use?
+
+| Method | Pros | Cons |
+|--------|------|------|
+| **Iframe embed** | Game stays within your Framer site | Can feel cramped; may need height tuning |
+| **Direct link** | Full-screen game experience, works great on mobile | User leaves tfnparty.com |
 
 ---
 
