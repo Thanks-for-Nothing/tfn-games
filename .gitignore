@@ -1,7 +1,3 @@
 node_modules
 .DS_Store
 tsconfig.tsbuildinfo
-
-# Game build outputs (rebuilt by Vercel)
-dist/2025
-dist/2026

@@ -3,7 +3,9 @@
   "private": true,
   "version": "1.0.0",
   "scripts": {
-    "build": "npm run build:cannon-fire",
-    "build:cannon-fire": "cd games/2026/cannon-fire && npm install && npm run build"
+    "build": "npm run build:active",
+    "build:active": "npm run build:2026-cannon-fire",
+    "build:2026-cannon-fire": "cd games/2026/cannon-fire && npm install && npm run build",
+    "freeze:2026-cannon-fire": "cd games/2026/cannon-fire && npm install && npm run build && echo 'Now commit dist/2026/cannon-fire/ and remove this game from build:active'"
   }
 }
