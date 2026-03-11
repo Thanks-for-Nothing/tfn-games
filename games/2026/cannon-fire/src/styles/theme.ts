@@ -1,0 +1,32 @@
+export const COLORS = {
+  deepTeal: '#2a6b5e',
+  darkNavy: '#1a3a4a',
+  darkNavyLight: '#243f52',
+  leather: '#5c3a1e',
+  leatherLight: '#7a4e2a',
+  darkGold: '#8b6914',
+  gold: '#c8a84e',
+  lightGold: '#d4a843',
+  parchment: '#f4e4c1',
+  lightParchment: '#e8d5a3',
+  ocean: '#1a4a6a',
+  oceanLight: '#2a5a7a',
+  oceanDark: '#0f2d42',
+  hit: '#cc3300',
+  hitGlow: '#ff6600',
+  miss: '#4488aa',
+  missLight: '#66aacc',
+  sunk: '#991100',
+  valid: '#2a8b5e',
+  invalid: '#cc3333',
+  white: '#ffffff',
+  black: '#000000',
+  textLight: '#f4e4c1',
+  textDark: '#2a1a0a',
+} as const;
+
+export const FONTS = {
+  heading: "'Pirata One', 'Georgia', serif",
+  body: "'IM Fell English', 'Georgia', serif",
+  label: "'Georgia', serif",
+} as const;

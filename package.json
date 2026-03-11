@@ -1,0 +1,9 @@
+{
+  "name": "tfn-games",
+  "private": true,
+  "version": "1.0.0",
+  "scripts": {
+    "build": "npm run build:cannon-fire",
+    "build:cannon-fire": "cd games/2026/cannon-fire && npm install && npm run build"
+  }
+}
