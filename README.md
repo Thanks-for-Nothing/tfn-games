@@ -166,6 +166,34 @@ Vercel auto-deploys on push. Your game will be live at `game.tfnparty.com/YEAR/g
 
 ---
 
+## Adding a New Year
+
+When a new event year starts, you just need to create the year folder and add games into it. There's no year-level config — years are just folders.
+
+### Steps
+
+1. Create the year folder under `games/`:
+   ```
+   games/2027/
+   ```
+2. Add games into it following the [Adding a New Game](#adding-a-new-game) steps above
+3. That's it — there's no year-level config file or setup
+
+### At the end of the year
+
+When the event is over, freeze all of that year's games (see [Freezing a Game](#freezing-a-game-end-of-event) below). This locks them as static files so they can never break, and removes them from the active build.
+
+### Pre-created years
+
+The following year folders already exist and are ready for games to be added:
+
+| Year | Folder | Status |
+|------|--------|--------|
+| 2026 | `games/2026/` | Active |
+| 2027 | `games/2027/` | Empty (ready for games) |
+
+---
+
 ## Freezing a Game (End of Event)
 
 When an event is over and you want to lock a game permanently:
