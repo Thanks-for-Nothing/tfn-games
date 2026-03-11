@@ -23,7 +23,7 @@ export const TitleScreen: React.FC<TitleScreenProps> = ({ onStart }) => {
         style={{
           position: 'absolute',
           inset: 0,
-          backgroundImage: `url(${import.meta.env.BASE_URL}assets/hero-image.png)`,
+          backgroundImage: `url(${import.meta.env.BASE_URL}assets/hero-image.jpg)`,
           backgroundSize: 'cover',
           backgroundPosition: 'center top',
           backgroundRepeat: 'no-repeat',
