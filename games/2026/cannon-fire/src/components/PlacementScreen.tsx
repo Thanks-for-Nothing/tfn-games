@@ -24,7 +24,7 @@ export const PlacementScreen: React.FC<PlacementScreenProps> = ({ state, dispatc
   // Calculate cell size based on viewport
   const cellSize = useMemo(() => {
     const vw = typeof window !== 'undefined' ? window.innerWidth : 375;
-    const maxGridWidth = Math.min(vw - 48, 400);
+    const maxGridWidth = vw - 32;
     return Math.floor((maxGridWidth - 26) / GRID_SIZE); // 26px for labels + gaps
   }, []);
 
@@ -112,7 +112,7 @@ export const PlacementScreen: React.FC<PlacementScreenProps> = ({ state, dispatc
       >
         <Grid
           board={state.playerBoard}
-          showShips={true}
+          showShips={false}
           onCellTap={handleGridCellTap}
           gridRef={gridRef}
         />
@@ -226,9 +226,9 @@ export const PlacementScreen: React.FC<PlacementScreenProps> = ({ state, dispatc
           color: allPlaced ? COLORS.parchment : COLORS.miss,
           border: `2px solid ${allPlaced ? COLORS.gold : COLORS.miss}`,
           borderRadius: '8px',
-          padding: '14px 40px',
+          padding: '10px 40px',
           fontFamily: FONTS.heading,
-          fontSize: '22px',
+          fontSize: '26px',
           cursor: allPlaced ? 'pointer' : 'not-allowed',
           textTransform: 'uppercase',
           letterSpacing: '3px',
@@ -248,8 +248,12 @@ export const PlacementScreen: React.FC<PlacementScreenProps> = ({ state, dispatc
         <div
           style={{
             position: 'fixed',
-            left: dragState.pointerPosition.x - (cellSize * dragState.draggedShipSize) / 2,
-            top: dragState.pointerPosition.y - cellSize / 2,
+            left: dragState.draggedShipOrientation === 'horizontal'
+              ? dragState.pointerPosition.x - (cellSize * dragState.draggedShipSize) / 2
+              : dragState.pointerPosition.x - cellSize / 2,
+            top: dragState.draggedShipOrientation === 'horizontal'
+              ? dragState.pointerPosition.y - cellSize / 2
+              : dragState.pointerPosition.y - (cellSize * dragState.draggedShipSize) / 2,
             pointerEvents: 'none',
             opacity: 0.6,
             zIndex: 1000,

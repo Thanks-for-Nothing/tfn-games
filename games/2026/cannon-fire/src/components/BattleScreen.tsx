@@ -1,4 +1,4 @@
-import React, { useCallback } from 'react';
+import React, { useCallback, useState, useEffect } from 'react';
 import type { GameState, GameAction } from '../game/types';
 import { Grid } from './Grid';
 import { MiniGrid } from './MiniGrid';
@@ -11,14 +11,31 @@ interface BattleScreenProps {
 
 export const BattleScreen: React.FC<BattleScreenProps> = ({ state, dispatch }) => {
   const isAttackView = state.activeGrid === 'attack';
+  const [pendingShot, setPendingShot] = useState<{ row: number; col: number } | null>(null);
+
+  // Clear pending shot when it's no longer the player's turn
+  useEffect(() => {
+    if (!state.isPlayerTurn || state.isComputerThinking) {
+      setPendingShot(null);
+    }
+  }, [state.isPlayerTurn, state.isComputerThinking]);
 
   const handleAttackCellTap = useCallback(
     (row: number, col: number) => {
       if (!state.isPlayerTurn || state.isComputerThinking) return;
-      dispatch({ type: 'PLAYER_FIRE', row, col });
+      if (state.computerBoard[row][col].state !== 'empty') return;
+      // Toggle selection: tap same cell again to deselect
+      setPendingShot(prev =>
+        prev?.row === row && prev?.col === col ? null : { row, col }
+      );
     },
-    [state.isPlayerTurn, state.isComputerThinking, dispatch]
+    [state.isPlayerTurn, state.isComputerThinking, state.computerBoard]
   );
+
+  const handleFire = useCallback(() => {
+    if (!pendingShot || !state.isPlayerTurn || state.isComputerThinking) return;
+    dispatch({ type: 'PLAYER_FIRE', row: pendingShot.row, col: pendingShot.col });
+  }, [pendingShot, state.isPlayerTurn, state.isComputerThinking, dispatch]);
 
   const handleSwapGrids = useCallback(() => {
     dispatch({ type: 'SWAP_GRIDS' });
@@ -78,76 +95,74 @@ export const BattleScreen: React.FC<BattleScreenProps> = ({ state, dispatch }) =
         {state.message}
       </div>
 
-      {/* Enemy ship status (what you're hunting) */}
-      <div
-        style={{
-          display: 'flex',
-          gap: '12px',
-          marginBottom: '6px',
-          justifyContent: 'center',
-          flexWrap: 'wrap',
-        }}
-      >
-        {computerShipStatus.map(ship => (
-          <div
-            key={ship.name}
-            style={{
-              display: 'flex',
-              alignItems: 'center',
-              gap: '4px',
-              opacity: ship.sunk ? 0.4 : 1,
-            }}
-          >
-            <span
-              style={{
-                fontFamily: FONTS.body,
-                fontSize: '22px',
-                color: ship.sunk ? COLORS.hit : COLORS.lightParchment,
-                textDecoration: ship.sunk ? 'line-through' : 'none',
-              }}
-            >
-              {ship.name}
-            </span>
-            <div style={{ display: 'flex', gap: '2px' }}>
-              {Array.from({ length: ship.size }).map((_, i) => (
-                <div
-                  key={i}
-                  style={{
-                    width: '8px',
-                    height: '8px',
-                    borderRadius: '2px',
-                    backgroundColor: ship.sunk ? COLORS.sunk : COLORS.gold,
-                    opacity: ship.sunk ? 0.5 : 0.7,
-                  }}
-                />
-              ))}
-            </div>
-          </div>
-        ))}
-      </div>
-
       {/* Large grid */}
       <div
         style={{
           width: '100%',
-          maxWidth: '380px',
           flex: '0 0 auto',
           animation: 'cannonfire-gridSwap 0.3s ease-out',
           position: 'relative',
         }}
       >
-        {/* Grid label */}
+        {/* Grid label row: title left, ship status right */}
         <div
           style={{
-            textAlign: 'center',
-            fontFamily: FONTS.heading,
-            fontSize: '28px',
-            color: COLORS.gold,
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'space-between',
             marginBottom: '4px',
-            letterSpacing: '1px',
           }}
         >
-          {isAttackView ? 'Enemy Waters' : 'Your Fleet'}
+          <div
+            style={{
+              fontFamily: FONTS.heading,
+              fontSize: '28px',
+              color: COLORS.gold,
+              letterSpacing: '1px',
+            }}
+          >
+            {isAttackView ? 'Enemy Waters' : 'Your Fleet'}
+          </div>
+
+          {/* Enemy ship status (what you're hunting) */}
+          <div style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
+            {computerShipStatus.map(ship => (
+              <div
+                key={ship.name}
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '4px',
+                  opacity: ship.sunk ? 0.4 : 1,
+                }}
+              >
+                <span
+                  style={{
+                    fontFamily: FONTS.body,
+                    fontSize: '22px',
+                    color: ship.sunk ? COLORS.hit : COLORS.lightParchment,
+                    textDecoration: ship.sunk ? 'line-through' : 'none',
+                  }}
+                >
+                  {ship.name}
+                </span>
+                <div style={{ display: 'flex', gap: '2px' }}>
+                  {Array.from({ length: ship.size }).map((_, i) => (
+                    <div
+                      key={i}
+                      style={{
+                        width: '8px',
+                        height: '8px',
+                        borderRadius: '2px',
+                        backgroundColor: ship.sunk ? COLORS.sunk : COLORS.gold,
+                        opacity: ship.sunk ? 0.5 : 0.7,
+                      }}
+                    />
+                  ))}
+                </div>
+              </div>
+            ))}
+          </div>
         </div>
 
         <Grid
@@ -155,6 +170,7 @@ export const BattleScreen: React.FC<BattleScreenProps> = ({ state, dispatch }) =
           showShips={largeShowShips}
           onCellTap={largeOnCellTap}
           disabled={largeDisabled}
+          pendingCell={isAttackView && pendingShot ? pendingShot : undefined}
         />
 
         {/* Show sunk ship silhouettes on attack grid */}
@@ -174,12 +190,40 @@ export const BattleScreen: React.FC<BattleScreenProps> = ({ state, dispatch }) =
             ))}
       </div>
 
+      {/* Fire button */}
+      {isAttackView && (
+        <button
+          onClick={handleFire}
+          disabled={!pendingShot || !state.isPlayerTurn || state.isComputerThinking}
+          style={{
+            marginTop: '8px',
+            backgroundColor: pendingShot && state.isPlayerTurn && !state.isComputerThinking
+              ? COLORS.hit
+              : COLORS.darkNavyLight,
+            color: COLORS.parchment,
+            border: `2px solid ${pendingShot && state.isPlayerTurn && !state.isComputerThinking ? COLORS.hitGlow : COLORS.miss}`,
+            borderRadius: '8px',
+            padding: '6px 48px',
+            fontFamily: FONTS.heading,
+            fontSize: '26px',
+            cursor: pendingShot && state.isPlayerTurn && !state.isComputerThinking ? 'pointer' : 'not-allowed',
+            textTransform: 'uppercase',
+            letterSpacing: '3px',
+            opacity: pendingShot && state.isPlayerTurn && !state.isComputerThinking ? 1 : 0.4,
+            transition: 'all 0.15s ease',
+            WebkitTapHighlightColor: 'transparent',
+            width: '100%',
+          }}
+        >
+          🔥 Fire!
+        </button>
+      )}
+
       {/* Bottom area: mini grid + player ship status */}
       <div
         style={{
           display: 'flex',
           alignItems: 'flex-start',
-          justifyContent: 'center',
           gap: '16px',
           marginTop: '8px',
           width: '100%',
@@ -188,28 +232,27 @@ export const BattleScreen: React.FC<BattleScreenProps> = ({ state, dispatch }) =
         }}
       >
         {/* Mini grid */}
-        <MiniGrid
-          board={smallBoard}
-          showShips={smallShowShips}
-          onTap={handleSwapGrids}
-          label={smallLabel}
-        />
+        <div style={{ flex: 1, display: 'flex', justifyContent: 'center' }}>
+          <MiniGrid
+            board={smallBoard}
+            showShips={smallShowShips}
+            onTap={handleSwapGrids}
+            label={smallLabel}
+          />
+        </div>
 
         {/* Your fleet status */}
         <div
           style={{
+            flex: 1,
             display: 'flex',
             flexDirection: 'column',
             gap: '6px',
-            padding: '8px',
-            backgroundColor: 'rgba(26, 58, 74, 0.5)',
-            border: `1px solid ${COLORS.gold}`,
-            borderRadius: '6px',
           }}
         >
           <span
             style={{
-              fontSize: '20px',
+              fontSize: '12px',
               color: COLORS.lightGold,
               fontFamily: "'Georgia', serif",
               textTransform: 'uppercase',

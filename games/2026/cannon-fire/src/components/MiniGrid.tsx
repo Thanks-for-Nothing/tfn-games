@@ -20,17 +20,13 @@ export const MiniGrid: React.FC<MiniGridProps> = ({ board, showShips, onTap, lab
         alignItems: 'center',
         gap: '4px',
         cursor: 'pointer',
-        padding: '8px',
-        backgroundColor: 'rgba(26, 58, 74, 0.5)',
-        border: `1px solid ${COLORS.gold}`,
-        borderRadius: '6px',
-        transition: 'transform 0.2s ease, border-color 0.2s ease',
+        transition: 'transform 0.2s ease',
         WebkitTapHighlightColor: 'transparent',
       }}
     >
       <span
         style={{
-          fontSize: '20px',
+          fontSize: '12px',
           color: COLORS.lightGold,
           fontFamily: "'Georgia', serif",
           textTransform: 'uppercase',

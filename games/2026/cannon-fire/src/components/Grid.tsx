@@ -10,6 +10,7 @@ interface GridProps {
   onCellTap?: (row: number, col: number) => void;
   disabled?: boolean;
   gridRef?: React.Ref<HTMLDivElement>;
+  pendingCell?: { row: number; col: number };
 }
 
 export const Grid: React.FC<GridProps> = ({
@@ -18,6 +19,7 @@ export const Grid: React.FC<GridProps> = ({
   onCellTap,
   disabled,
   gridRef,
+  pendingCell,
 }) => {
   const labelStyle: React.CSSProperties = {
     display: 'flex',
@@ -25,7 +27,7 @@ export const Grid: React.FC<GridProps> = ({
     justifyContent: 'center',
     color: COLORS.gold,
     fontFamily: FONTS.label,
-    fontSize: '24px',
+    fontSize: '18px',
     fontWeight: 'bold',
     textShadow: '1px 1px 2px rgba(0,0,0,0.5)',
     userSelect: 'none',
@@ -38,11 +40,7 @@ export const Grid: React.FC<GridProps> = ({
         display: 'grid',
         gridTemplateColumns: `24px repeat(7, 1fr)`,
         gridTemplateRows: `24px repeat(7, 1fr)`,
-        gap: '1px',
-        backgroundColor: COLORS.darkNavy,
-        border: `2px solid ${COLORS.gold}`,
-        borderRadius: '4px',
-        padding: '1px',
+        gap: '0',
         width: '100%',
         aspectRatio: '1',
         maxWidth: '100%',
@@ -73,6 +71,7 @@ export const Grid: React.FC<GridProps> = ({
               showShip={showShips}
               onTap={onCellTap ? () => onCellTap(rowIdx, colIdx) : undefined}
               disabled={disabled}
+              isPending={pendingCell?.row === rowIdx && pendingCell?.col === colIdx}
             />
           ))}
         </React.Fragment>

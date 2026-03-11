@@ -8,6 +8,7 @@ interface GridCellProps {
   showShip: boolean;
   onTap?: () => void;
   disabled?: boolean;
+  isPending?: boolean;
 }
 
 export const GridCell: React.FC<GridCellProps> = ({
@@ -16,12 +17,15 @@ export const GridCell: React.FC<GridCellProps> = ({
   showShip,
   onTap,
   disabled,
+  isPending,
 }) => {
   const baseStyle: React.CSSProperties = {
     position: 'relative',
     aspectRatio: '1',
-    backgroundColor: COLORS.ocean,
-    border: `1px solid rgba(42, 107, 94, 0.3)`,
+    backgroundColor: isPending ? 'rgba(200, 168, 78, 0.25)' : COLORS.ocean,
+    border: isPending
+      ? `2px solid ${COLORS.gold}`
+      : `1px solid rgba(100, 180, 210, 0.4)`,
     cursor: disabled ? 'default' : 'pointer',
     overflow: 'hidden',
     transition: 'background-color 0.15s ease',
@@ -126,6 +130,28 @@ export const GridCell: React.FC<GridCellProps> = ({
     >
       {shipStyle && <div style={shipStyle} />}
       {renderMarker()}
+      {isPending && (
+        <div
+          style={{
+            position: 'absolute',
+            inset: 0,
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            animation: 'cannonfire-pulse 1s ease-in-out infinite',
+          }}
+        >
+          <div
+            style={{
+              width: '40%',
+              height: '40%',
+              borderRadius: '50%',
+              backgroundColor: COLORS.gold,
+              opacity: 0.7,
+            }}
+          />
+        </div>
+      )}
     </div>
   );
 };

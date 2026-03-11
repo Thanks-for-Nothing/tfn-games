@@ -1,5 +1,5 @@
 import type { GameState, GameAction } from './types';
-import { SHIPS } from './constants';
+import { SHIPS, GRID_SIZE } from './constants';
 import {
   createEmptyBoard,
   placeShipOnBoard,
@@ -104,11 +104,30 @@ export function gameReducer(state: GameState, action: GameAction): GameState {
       const newOrientation = ship.orientation === 'horizontal' ? 'vertical' as const : 'horizontal' as const;
       const boardWithout = removeShipFromBoard(state.playerBoard, action.shipId);
 
-      if (!isValidPlacement(boardWithout, action.shipId, ship.size, ship.startRow, ship.startCol, newOrientation)) {
-        return state; // Can't rotate — would go out of bounds or overlap
+      // Pivot around the center cell of the ship
+      const half = Math.floor((ship.size - 1) / 2);
+      let newStartRow: number;
+      let newStartCol: number;
+
+      if (ship.orientation === 'horizontal') {
+        // Rotating to vertical: center col becomes new startCol, shift startRow up by half
+        newStartRow = ship.startRow - half;
+        newStartCol = ship.startCol + half;
+      } else {
+        // Rotating to horizontal: center row becomes new startRow, shift startCol left by half
+        newStartRow = ship.startRow + half;
+        newStartCol = ship.startCol - half;
       }
 
-      const rotatedShip = { ...ship, orientation: newOrientation };
+      // Clamp to grid bounds
+      newStartRow = Math.max(0, Math.min(GRID_SIZE - (newOrientation === 'vertical' ? ship.size : 1), newStartRow));
+      newStartCol = Math.max(0, Math.min(GRID_SIZE - (newOrientation === 'horizontal' ? ship.size : 1), newStartCol));
+
+      if (!isValidPlacement(boardWithout, action.shipId, ship.size, newStartRow, newStartCol, newOrientation)) {
+        return state; // Can't rotate — would overlap another ship
+      }
+
+      const rotatedShip = { ...ship, orientation: newOrientation, startRow: newStartRow, startCol: newStartCol };
       const newBoard = placeShipOnBoard(boardWithout, rotatedShip);
 
       return {
@@ -233,7 +252,6 @@ export function gameReducer(state: GameState, action: GameAction): GameState {
       return {
         ...state,
         isComputerThinking: action.thinking,
-        message: action.thinking ? 'The enemy takes aim...' : state.message,
       };
     }
 

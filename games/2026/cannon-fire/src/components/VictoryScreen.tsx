@@ -63,7 +63,7 @@ export const VictoryScreen: React.FC = () => {
             fontFamily: FONTS.body,
             fontSize: 'clamp(32px, 8vw, 40px)',
             color: COLORS.parchment,
-            lineHeight: 1.6,
+            lineHeight: 1.1,
             margin: 0,
           }}
         >

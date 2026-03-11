@@ -72,11 +72,11 @@ export const TitleScreen: React.FC<TitleScreenProps> = ({ onStart }) => {
           <p
             style={{
               fontFamily: FONTS.body,
-              fontSize: 'clamp(26px, 6vw, 32px)',
+              fontSize: '22px',
               color: COLORS.parchment,
               textAlign: 'center',
-              maxWidth: '280px',
-              lineHeight: 1.5,
+              maxWidth: '420px',
+              lineHeight: '29px',
               textShadow: '1px 1px 4px rgba(0,0,0,0.8)',
             }}
           >
@@ -92,9 +92,9 @@ export const TitleScreen: React.FC<TitleScreenProps> = ({ onStart }) => {
               color: COLORS.parchment,
               border: `2px solid ${COLORS.gold}`,
               borderRadius: '8px',
-              padding: '16px 52px',
+              padding: '12px 52px',
               fontFamily: FONTS.heading,
-              fontSize: '26px',
+              fontSize: '30px',
               cursor: 'pointer',
               textTransform: 'uppercase',
               letterSpacing: '3px',
