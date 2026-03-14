@@ -27,7 +27,7 @@
         }
         #ui {
             position: absolute;
-            bottom: 30px;
+            top: 30px;
             width: 100%;
             text-align: center;
             z-index: 2;
@@ -36,8 +36,8 @@
         }
         #ui p {
             margin: 0;
-            color: #665;
-            font-size: 17px;
+            color: #ffffff;
+            font-size: 34px;
             font-weight: 500;
             letter-spacing: 0.5px;
         }
@@ -63,7 +63,6 @@
     <div id="indicator"></div>
 
     <script>
-        // Base URL for assets (works with Vite subdirectory deployment)
         const BASE = document.querySelector('base')?.href || '/2026/flags/';
         function assetURL(path) { return BASE + path; }
 
@@ -491,7 +490,69 @@
             varying vec2 v_uv;
             uniform sampler2D u_tex;
             uniform sampler2D u_backTex;
+            uniform float u_flagSeed;
+
+            // Hash-based noise for tattered edges
+            float hash(vec2 p) {
+                return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453);
+            }
+            float noise(vec2 p) {
+                vec2 i = floor(p);
+                vec2 f = fract(p);
+                f = f * f * (3.0 - 2.0 * f);
+                float a = hash(i);
+                float b = hash(i + vec2(1.0, 0.0));
+                float c = hash(i + vec2(0.0, 1.0));
+                float d = hash(i + vec2(1.0, 1.0));
+                return mix(mix(a, b, f.x), mix(c, d, f.x), f.y);
+            }
+            float fbm(vec2 p) {
+                float v = 0.0;
+                v += noise(p * 4.0) * 0.5;
+                v += noise(p * 8.0) * 0.25;
+                v += noise(p * 16.0) * 0.125;
+                v += noise(p * 32.0) * 0.0625;
+                return v;
+            }
+
             void main() {
+                // Per-flag seed offsets all noise so each flag is unique
+                vec2 seed = vec2(u_flagSeed * 17.3, u_flagSeed * 31.7);
+                vec2 uv = v_uv;
+
+                // Tattered edges
+                float edgeL = uv.x;
+                float edgeR = 1.0 - uv.x;
+                float edgeB = 1.0 - uv.y;
+                // More tatter on bottom and sides, less on top (attached to rope)
+                float tearBottom = fbm(vec2(uv.x * 6.0, 0.0) + seed) * 0.15;
+                float tearLeft = fbm(vec2(0.0, uv.y * 5.0) + seed) * 0.08;
+                float tearRight = fbm(vec2(1.0, uv.y * 5.0) + seed + 3.0) * 0.08;
+                if (edgeB < tearBottom) discard;
+                if (edgeL < tearLeft) discard;
+                if (edgeR < tearRight) discard;
+
+                // Large holes across the flag
+                float bigHole = fbm(uv * 5.0 + seed);
+                float bigHole2 = fbm(uv * 7.0 + seed + 4.4);
+                if (bigHole > 0.82) discard;
+                if (bigHole2 > 0.86) discard;
+
+                // Medium rips and tears
+                float rip = fbm(uv * 12.0 + seed + 7.3);
+                if (rip > 0.84) discard;
+
+                // Thin slash-like tears (elongated)
+                float slash = noise(vec2(uv.x * 3.0, uv.y * 40.0) + seed + 5.5);
+                float slash2 = noise(vec2(uv.x * 40.0, uv.y * 3.0) + seed + 9.2);
+                float slashMask = fbm(uv * 15.0 + seed + 2.1);
+                if (slash > 0.96 && slashMask > 0.45) discard;
+                if (slash2 > 0.96 && slashMask > 0.5) discard;
+
+                // Tiny pinhole damage
+                float pinholes = noise(uv * 60.0 + seed);
+                if (pinholes > 0.92 && fbm(uv * 20.0 + seed) > 0.6) discard;
+
                 vec3 norm = normalize(v_norm);
                 if (!gl_FrontFacing) norm = -norm;
 
@@ -530,7 +591,6 @@
                 float spec2 = pow(max(dot(norm, halfDir2), 0.0), 16.0) * 0.04;
 
                 // Swap textures based on facing (winding is CW for the design side)
-                vec2 uv = v_uv;
                 vec4 texColor;
                 if (!gl_FrontFacing) {
                     texColor = texture2D(u_tex, uv);
@@ -571,6 +631,7 @@
         const uView = gl.getUniformLocation(program, "u_view");
         const uTex = gl.getUniformLocation(program, "u_tex");
         const uBackTex = gl.getUniformLocation(program, "u_backTex");
+        const uFlagSeed = gl.getUniformLocation(program, "u_flagSeed");
 
         // --- Shadow shader for planar shadows on background ---
         const shadowVs = `
@@ -1004,9 +1065,9 @@
         const indicator = document.getElementById('indicator');
 
         function getRay() {
-            let tanFov = Math.tan(fov / 2);
-            let dx = pointerX * aspect * tanFov;
-            let dy = pointerY * tanFov;
+            let tanHfov = Math.tan(fov / 2); // horizontal half-fov tan
+            let dx = pointerX * tanHfov;
+            let dy = pointerY * tanHfov / aspect;
             let dz = -1;
             let len = Math.sqrt(dx * dx + dy * dy + dz * dz);
             return {
@@ -1320,7 +1381,10 @@
             gl.enable(gl.DEPTH_TEST);
             gl.clear(gl.DEPTH_BUFFER_BIT);
 
-            setPerspective(projMatrix, fov, aspect, 0.1, 100.0);
+            // Fixed horizontal FOV: compute vertical fov from aspect ratio
+            let hfov = fov; // treat fov as the desired horizontal FOV
+            let vfov = 2 * Math.atan(Math.tan(hfov / 2) / aspect);
+            setPerspective(projMatrix, vfov, aspect, 0.1, 100.0);
             setTranslation(viewMatrix, -camPos.x, -camPos.y, -camPos.z);
 
             // --- Draw shadows ---
@@ -1358,6 +1422,7 @@
                 gl.activeTexture(gl.TEXTURE1);
                 gl.bindTexture(gl.TEXTURE_2D, backTextures[f]);
                 gl.uniform1i(uBackTex, 1);
+                gl.uniform1f(uFlagSeed, f + 1.0);
 
                 gl.bindBuffer(gl.ARRAY_BUFFER, flag.posBuf);
                 gl.bufferData(gl.ARRAY_BUFFER, flag.posData, gl.DYNAMIC_DRAW);
