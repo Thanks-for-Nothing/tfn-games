@@ -5,6 +5,13 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
     <title>Pirate Flags</title>
     <style>
+        @font-face {
+            font-family: 'GlamourAbsolute';
+            src: url('GlamourAbsolute-regular.otf') format('opentype');
+            font-weight: 400;
+            font-style: normal;
+            font-display: swap;
+        }
         body {
             margin: 0;
             padding: 0;
@@ -27,7 +34,7 @@
         }
         #ui {
             position: absolute;
-            top: 30px;
+            top: 50px;
             width: 100%;
             text-align: center;
             z-index: 2;
@@ -37,9 +44,10 @@
         #ui p {
             margin: 0;
             color: #ffffff;
-            font-size: 34px;
-            font-weight: 500;
-            letter-spacing: 0.5px;
+            font-family: 'GlamourAbsolute', serif;
+            font-size: 38px;
+            font-weight: 400;
+            letter-spacing: 1.5px;
         }
         #indicator {
             position: absolute;
@@ -532,26 +540,25 @@
                 if (edgeL < tearLeft) discard;
                 if (edgeR < tearRight) discard;
 
-                // Large holes across the flag
-                float bigHole = fbm(uv * 5.0 + seed);
-                float bigHole2 = fbm(uv * 7.0 + seed + 4.4);
-                if (bigHole > 0.82) discard;
-                if (bigHole2 > 0.86) discard;
+                // Wind-torn holes: stretched vertically like tears from wind
+                // Compress Y freq to elongate features downward
+                vec2 tearUV1 = vec2(uv.x * 2.5, uv.y * 1.2);
+                float bigTear = fbm(tearUV1 + seed);
+                if (bigTear > 0.74) discard;
 
-                // Medium rips and tears
-                float rip = fbm(uv * 12.0 + seed + 7.3);
-                if (rip > 0.84) discard;
+                vec2 tearUV2 = vec2(uv.x * 3.5, uv.y * 1.5);
+                float bigTear2 = fbm(tearUV2 + seed + 4.4);
+                if (bigTear2 > 0.78) discard;
 
-                // Thin slash-like tears (elongated)
-                float slash = noise(vec2(uv.x * 3.0, uv.y * 40.0) + seed + 5.5);
-                float slash2 = noise(vec2(uv.x * 40.0, uv.y * 3.0) + seed + 9.2);
-                float slashMask = fbm(uv * 15.0 + seed + 2.1);
-                if (slash > 0.96 && slashMask > 0.45) discard;
-                if (slash2 > 0.96 && slashMask > 0.5) discard;
+                // Medium vertical rips
+                vec2 ripUV = vec2(uv.x * 6.0, uv.y * 2.5);
+                float rip = fbm(ripUV + seed + 7.3);
+                if (rip > 0.80) discard;
 
-                // Tiny pinhole damage
-                float pinholes = noise(uv * 60.0 + seed);
-                if (pinholes > 0.92 && fbm(uv * 20.0 + seed) > 0.6) discard;
+                // Thin vertical slash tears
+                float slash = noise(vec2(uv.x * 5.0, uv.y * 30.0) + seed + 5.5);
+                float slashMask = fbm(vec2(uv.x * 8.0, uv.y * 3.0) + seed + 2.1);
+                if (slash > 0.96 && slashMask > 0.5) discard;
 
                 vec3 norm = normalize(v_norm);
                 if (!gl_FrontFacing) norm = -norm;
@@ -811,7 +818,7 @@
         const numParticles = numX * numY;
         const flagWidth = 3.0;
         const flagHeight = 4.0;
-        const flagSpacing = 3.6;
+        const flagSpacing = 3.2;
         const flagOffsets = [-flagSpacing, 0, flagSpacing];
 
         const flags = [];
@@ -947,7 +954,7 @@
         const ropeRadius = 0.055; // overall rope radius
         const strandRadius = 0.032; // individual strand radius
         const twistRate = 18.0; // twists per unit length
-        const ropeOverhang = 0.3;
+        const ropeOverhang = 0.1;
         const ropeSegments = 60; // high detail for smooth twist
         const ropeBuffers = [];
 
@@ -991,6 +998,28 @@
             return { verts, norms, idxs };
         }
 
+        // Catmull-Rom spline interpolation
+        function catmullRom(points, t) {
+            const n = points.length - 1;
+            const f = Math.min(t, 0.9999) * n;
+            const i = Math.min(Math.floor(f), n - 1);
+            const u = f - i;
+            const p0 = points[Math.max(i - 1, 0)];
+            const p1 = points[i];
+            const p2 = points[Math.min(i + 1, n)];
+            const p3 = points[Math.min(i + 2, n)];
+            const u2 = u * u, u3 = u2 * u;
+            return {
+                x: 0.5 * ((2*p1.x) + (-p0.x + p2.x)*u + (2*p0.x - 5*p1.x + 4*p2.x - p3.x)*u2 + (-p0.x + 3*p1.x - 3*p2.x + p3.x)*u3),
+                y: 0.5 * ((2*p1.y) + (-p0.y + p2.y)*u + (2*p0.y - 5*p1.y + 4*p2.y - p3.y)*u2 + (-p0.y + 3*p1.y - 3*p2.y + p3.y)*u3),
+                z: 0.5 * ((2*p1.z) + (-p0.z + p2.z)*u + (2*p0.z - 5*p1.z + 4*p2.z - p3.z)*u2 + (-p0.z + 3*p1.z - 3*p2.z + p3.z)*u3),
+            };
+        }
+
+        // --- Build rope geometry (3 segments, one per flag) ---
+        const leftKnotX = -flagWidth / 2 - ropeOverhang + flagOffsets[0];
+        const rightKnotX = flagWidth / 2 + ropeOverhang + flagOffsets[2];
+
         for (let f = 0; f < 3; f++) {
             const ox = flagOffsets[f];
             const startX = -flagWidth / 2 - ropeOverhang + ox;
@@ -1030,6 +1059,80 @@
             gl.bufferData(gl.ELEMENT_ARRAY_BUFFER, new Uint16Array(allIdxs), gl.STATIC_DRAW);
             ropeBuffers.push({ posBuf: rPosBuf, normBuf: rNormBuf, idxBuf: rIdxBuf, count: allIdxs.length });
         }
+
+        // --- Rope knots at each end (overhand knot with frayed ends) ---
+        const knotBuffers = [];
+        const knotSize = 0.14;
+        const knotDangle = 0.35;
+
+        [{kx: leftKnotX, dir: 1}, {kx: rightKnotX, dir: -1}].forEach(({kx, dir}) => {
+            const allVerts = [], allNorms = [], allIdxs = [];
+            let vertOffset = 0;
+
+            // Overhand knot center path control points
+            const s = knotSize;
+            const centerPts = [
+                { x: kx + dir*s*1.3,  y: 0,          z: 0 },
+                { x: kx + dir*s*0.4,  y: -s*0.3,     z: s*0.6 },
+                { x: kx - dir*s*0.4,  y: -s*0.8,     z: s*0.3 },
+                { x: kx - dir*s*0.5,  y: -s*0.3,     z: -s*0.4 },
+                { x: kx + dir*s*0.0,  y: s*0.1,      z: -s*0.5 },
+                { x: kx + dir*s*0.3,  y: -s*0.4,     z: 0 },
+                { x: kx,               y: -s*1.3,     z: 0 },
+            ];
+
+            // Each strand spirals around the center path
+            for (let strand = 0; strand < strandCount; strand++) {
+                const phase = (strand / strandCount) * Math.PI * 2;
+
+                const strandPts = centerPts.map((p, idx) => {
+                    const a = idx * 1.8 + phase;
+                    const r = ropeRadius * 0.6;
+                    return {
+                        x: p.x + Math.cos(a) * r,
+                        y: p.y + Math.sin(a) * r * 0.3,
+                        z: p.z + Math.sin(a) * r
+                    };
+                });
+
+                const knotPath = (t) => catmullRom(strandPts, t);
+                const tube = buildTube(knotPath, 36, strandRadius * 1.05, strandSides);
+                allVerts.push(...tube.verts);
+                allNorms.push(...tube.norms);
+                for (const idx of tube.idxs) allIdxs.push(idx + vertOffset);
+                vertOffset += (36 + 1) * strandSides;
+            }
+
+            // Frayed rope end: strands spread apart as they hang
+            for (let strand = 0; strand < strandCount; strand++) {
+                const phase = (strand / strandCount) * Math.PI * 2;
+                const dangPath = (t) => {
+                    const spread = t * 0.12;
+                    const sway = Math.sin(t * Math.PI * 0.7) * 0.02;
+                    return {
+                        x: kx + Math.cos(phase + 0.5) * spread + sway * dir,
+                        y: -knotSize * 1.3 - t * knotDangle,
+                        z: Math.sin(phase + 0.5) * spread * 0.5
+                    };
+                };
+                const tube = buildTube(dangPath, 10, strandRadius * 0.7, strandSides);
+                allVerts.push(...tube.verts);
+                allNorms.push(...tube.norms);
+                for (const idx of tube.idxs) allIdxs.push(idx + vertOffset);
+                vertOffset += (10 + 1) * strandSides;
+            }
+
+            const kPosBuf = gl.createBuffer();
+            gl.bindBuffer(gl.ARRAY_BUFFER, kPosBuf);
+            gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(allVerts), gl.STATIC_DRAW);
+            const kNormBuf = gl.createBuffer();
+            gl.bindBuffer(gl.ARRAY_BUFFER, kNormBuf);
+            gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(allNorms), gl.STATIC_DRAW);
+            const kIdxBuf = gl.createBuffer();
+            gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, kIdxBuf);
+            gl.bufferData(gl.ELEMENT_ARRAY_BUFFER, new Uint16Array(allIdxs), gl.STATIC_DRAW);
+            knotBuffers.push({ posBuf: kPosBuf, normBuf: kNormBuf, idxBuf: kIdxBuf, count: allIdxs.length });
+        });
 
         // Matrices
         const projMatrix = new Float32Array(16);
@@ -1422,7 +1525,7 @@
                 gl.activeTexture(gl.TEXTURE1);
                 gl.bindTexture(gl.TEXTURE_2D, backTextures[f]);
                 gl.uniform1i(uBackTex, 1);
-                gl.uniform1f(uFlagSeed, f + 1.0);
+                gl.uniform1f(uFlagSeed, [3.7, 7.1, 11.3][f]);
 
                 gl.bindBuffer(gl.ARRAY_BUFFER, flag.posBuf);
                 gl.bufferData(gl.ARRAY_BUFFER, flag.posData, gl.DYNAMIC_DRAW);
@@ -1456,6 +1559,18 @@
                 gl.vertexAttribPointer(aRopeNorm, 3, gl.FLOAT, false, 0, 0);
                 gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, rb.idxBuf);
                 gl.drawElements(gl.TRIANGLES, rb.count, gl.UNSIGNED_SHORT, 0);
+            }
+            // --- Draw rope knots ---
+            for (let k = 0; k < knotBuffers.length; k++) {
+                const kb = knotBuffers[k];
+                gl.bindBuffer(gl.ARRAY_BUFFER, kb.posBuf);
+                gl.enableVertexAttribArray(aRopePos);
+                gl.vertexAttribPointer(aRopePos, 3, gl.FLOAT, false, 0, 0);
+                gl.bindBuffer(gl.ARRAY_BUFFER, kb.normBuf);
+                gl.enableVertexAttribArray(aRopeNorm);
+                gl.vertexAttribPointer(aRopeNorm, 3, gl.FLOAT, false, 0, 0);
+                gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, kb.idxBuf);
+                gl.drawElements(gl.TRIANGLES, kb.count, gl.UNSIGNED_SHORT, 0);
             }
 
             requestAnimationFrame(render);
