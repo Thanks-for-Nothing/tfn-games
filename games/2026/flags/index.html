@@ -33,21 +33,7 @@
             cursor: grabbing;
         }
         #ui {
-            position: absolute;
-            top: 50px;
-            width: 100%;
-            text-align: center;
-            z-index: 2;
-            pointer-events: none;
-            user-select: none;
-        }
-        #ui p {
-            margin: 0;
-            color: #ffffff;
-            font-family: 'GlamourAbsolute', serif;
-            font-size: 38px;
-            font-weight: 400;
-            letter-spacing: 1.5px;
+            display: none;
         }
         #indicator {
             position: absolute;
@@ -723,6 +709,82 @@
         loadBackFaceImage(assetURL('text-blackbeard.png'), 0);
         loadBackFaceImage(assetURL('text-bonny.png'), 1);
         loadBackFaceImage(assetURL('text-avery.png'), 2);
+
+        // --- Title text rendered as 3D quad (behind flags in z-space) ---
+        const titleVs = `
+            attribute vec3 a_titlePos;
+            attribute vec2 a_titleUv;
+            uniform mat4 u_proj;
+            uniform mat4 u_view;
+            varying vec2 v_uv;
+            void main() {
+                v_uv = a_titleUv;
+                gl_Position = u_proj * u_view * vec4(a_titlePos, 1.0);
+            }
+        `;
+        const titleFs = `
+            precision mediump float;
+            varying vec2 v_uv;
+            uniform sampler2D u_titleTex;
+            void main() {
+                vec4 c = texture2D(u_titleTex, v_uv);
+                if (c.a < 0.05) discard;
+                gl_FragColor = c;
+            }
+        `;
+        const titleProgram = gl.createProgram();
+        gl.attachShader(titleProgram, createShader(gl.VERTEX_SHADER, titleVs));
+        gl.attachShader(titleProgram, createShader(gl.FRAGMENT_SHADER, titleFs));
+        gl.linkProgram(titleProgram);
+        const aTitlePos = gl.getAttribLocation(titleProgram, "a_titlePos");
+        const aTitleUv = gl.getAttribLocation(titleProgram, "a_titleUv");
+        const uTitleProj = gl.getUniformLocation(titleProgram, "u_proj");
+        const uTitleView = gl.getUniformLocation(titleProgram, "u_view");
+        const uTitleTex = gl.getUniformLocation(titleProgram, "u_titleTex");
+
+        // Create title text texture from canvas
+        const titleCanvas = document.createElement('canvas');
+        titleCanvas.width = 2048; titleCanvas.height = 256;
+        const titleCtx = titleCanvas.getContext('2d');
+        titleCtx.clearRect(0, 0, titleCanvas.width, titleCanvas.height);
+        titleCtx.fillStyle = '#ffffff';
+        titleCtx.font = '400 128px GlamourAbsolute, serif';
+        titleCtx.textAlign = 'center';
+        titleCtx.textBaseline = 'middle';
+        titleCtx.fillText('Whose colors be these?', titleCanvas.width / 2, titleCanvas.height / 2);
+
+        const titleTexture = gl.createTexture();
+        gl.bindTexture(gl.TEXTURE_2D, titleTexture);
+        gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, titleCanvas);
+        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
+        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
+        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
+        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+
+        // Re-render title texture once font loads
+        document.fonts.ready.then(() => {
+            titleCtx.clearRect(0, 0, titleCanvas.width, titleCanvas.height);
+            titleCtx.fillStyle = '#ffffff';
+            titleCtx.font = '400 128px GlamourAbsolute, serif';
+            titleCtx.textAlign = 'center';
+            titleCtx.textBaseline = 'middle';
+            titleCtx.fillText('Whose colors be these?', titleCanvas.width / 2, titleCanvas.height / 2);
+            gl.bindTexture(gl.TEXTURE_2D, titleTexture);
+            gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, titleCanvas);
+        });
+
+        // Title quad in world space: wide, positioned above flags, behind them in z
+        const titleW = 9.0, titleH = 1.1;
+        const titleY = 1.3, titleZ = -0.15;
+        const titleQuadVerts = new Float32Array([
+            -titleW/2, titleY + titleH/2, titleZ,  0, 0,
+            titleW/2, titleY + titleH/2, titleZ,   1, 0,
+            -titleW/2, titleY - titleH/2, titleZ,  0, 1,
+            titleW/2, titleY - titleH/2, titleZ,   1, 1,
+        ]);
+        const titleBuf = gl.createBuffer();
+        gl.bindBuffer(gl.ARRAY_BUFFER, titleBuf);
+        gl.bufferData(gl.ARRAY_BUFFER, titleQuadVerts, gl.STATIC_DRAW);
 
         // --- Background shader for planks texture ---
         const bgVs = `
@@ -1489,6 +1551,25 @@
             let vfov = 2 * Math.atan(Math.tan(hfov / 2) / aspect);
             setPerspective(projMatrix, vfov, aspect, 0.1, 100.0);
             setTranslation(viewMatrix, -camPos.x, -camPos.y, -camPos.z);
+
+            // --- Draw title text (behind flags in z-space) ---
+            gl.useProgram(titleProgram);
+            gl.uniformMatrix4fv(uTitleProj, false, projMatrix);
+            gl.uniformMatrix4fv(uTitleView, false, viewMatrix);
+            gl.bindBuffer(gl.ARRAY_BUFFER, titleBuf);
+            gl.enableVertexAttribArray(aTitlePos);
+            gl.vertexAttribPointer(aTitlePos, 3, gl.FLOAT, false, 20, 0);
+            gl.enableVertexAttribArray(aTitleUv);
+            gl.vertexAttribPointer(aTitleUv, 2, gl.FLOAT, false, 20, 12);
+            gl.activeTexture(gl.TEXTURE0);
+            gl.bindTexture(gl.TEXTURE_2D, titleTexture);
+            gl.uniform1i(uTitleTex, 0);
+            gl.enable(gl.BLEND);
+            gl.blendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA);
+            gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
+            gl.disableVertexAttribArray(aTitlePos);
+            gl.disableVertexAttribArray(aTitleUv);
+            gl.disable(gl.BLEND);
 
             // --- Draw shadows ---
             gl.useProgram(shadowProgram);
