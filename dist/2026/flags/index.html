@@ -1,0 +1,1405 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+    <title>Pirate Flags</title>
+    <style>
+        body {
+            margin: 0;
+            padding: 0;
+            background-color: #1a1a2e;
+            overflow: hidden;
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+            touch-action: none;
+        }
+        #glcanvas {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100vw;
+            height: 100vh;
+            z-index: 1;
+            cursor: grab;
+        }
+        #glcanvas:active {
+            cursor: grabbing;
+        }
+        #ui {
+            position: absolute;
+            bottom: 30px;
+            width: 100%;
+            text-align: center;
+            z-index: 2;
+            pointer-events: none;
+            user-select: none;
+        }
+        #ui p {
+            margin: 0;
+            color: #665;
+            font-size: 17px;
+            font-weight: 500;
+            letter-spacing: 0.5px;
+        }
+        #indicator {
+            position: absolute;
+            width: 32px;
+            height: 32px;
+            background: rgba(255, 255, 255, 0.15);
+            border: 2px solid rgba(255, 255, 255, 0.35);
+            border-radius: 50%;
+            transform: translate(-50%, -50%);
+            pointer-events: none;
+            display: none;
+            z-index: 10;
+        }
+    </style>
+</head>
+<body>
+    <canvas id="glcanvas"></canvas>
+    <div id="ui">
+        <p>Whose colors be these?</p>
+    </div>
+    <div id="indicator"></div>
+
+    <script>
+        // Base URL for assets (works with Vite subdirectory deployment)
+        const BASE = document.querySelector('base')?.href || '/2026/flags/';
+        function assetURL(path) { return BASE + path; }
+
+        // --- 1. Texture from PNG images (3:4 portrait, i.e. 4:3 sideways) ---
+
+        // Load a PNG image onto a canvas texture
+        function loadFlagTexture(src) {
+            return new Promise((resolve) => {
+                const img = new Image();
+                img.crossOrigin = 'anonymous';
+                img.onload = () => {
+                    // Create canvas at 3:4 portrait ratio
+                    const c = document.createElement('canvas');
+                    c.width = 768;
+                    c.height = 1024;
+                    const ctx = c.getContext('2d');
+
+                    // Black background
+                    ctx.fillStyle = '#111';
+                    ctx.fillRect(0, 0, c.width, c.height);
+
+                    // Draw image scaled to fill, maintaining aspect ratio
+                    const imgAspect = img.width / img.height;
+                    const canvasAspect = c.width / c.height;
+                    let drawW, drawH, dx, dy;
+                    if (imgAspect > canvasAspect) {
+                        // Image is wider - fit height, crop sides
+                        drawH = c.height;
+                        drawW = c.height * imgAspect;
+                        dx = (c.width - drawW) / 2;
+                        dy = 0;
+                    } else {
+                        // Image is taller - fit width, crop top/bottom
+                        drawW = c.width;
+                        drawH = c.width / imgAspect;
+                        dx = 0;
+                        dy = (c.height - drawH) / 2;
+                    }
+                    // Rotate image 90° clockwise before drawing
+                    const rotCanvas = document.createElement('canvas');
+                    rotCanvas.width = img.height;
+                    rotCanvas.height = img.width;
+                    const rotCtx = rotCanvas.getContext('2d');
+                    rotCtx.translate(rotCanvas.width / 2, rotCanvas.height / 2);
+                    rotCtx.rotate(Math.PI / 2);
+                    rotCtx.drawImage(img, -img.width / 2, -img.height / 2);
+
+                    // Recalculate fit with rotated image
+                    const rAspect = rotCanvas.width / rotCanvas.height;
+                    if (rAspect > canvasAspect) {
+                        drawH = c.height;
+                        drawW = c.height * rAspect;
+                        dx = (c.width - drawW) / 2;
+                        dy = 0;
+                    } else {
+                        drawW = c.width;
+                        drawH = c.width / rAspect;
+                        dx = 0;
+                        dy = (c.height - drawH) / 2;
+                    }
+                    ctx.drawImage(rotCanvas, dx, dy, drawW, drawH);
+                    resolve(c);
+                };
+                img.onerror = () => {
+                    // Fallback: black flag with skull
+                    const c = document.createElement('canvas');
+                    c.width = 768;
+                    c.height = 1024;
+                    const ctx = c.getContext('2d');
+                    ctx.fillStyle = '#111';
+                    ctx.fillRect(0, 0, c.width, c.height);
+                    ctx.fillStyle = '#e8e0d0';
+                    ctx.font = 'bold 120px serif';
+                    ctx.textAlign = 'center';
+                    ctx.fillText('\u2620', c.width / 2, c.height / 2 + 40);
+                    resolve(c);
+                };
+                img.src = src;
+            });
+        }
+
+        // Fallback: draw pirate flags on canvas if no images provided
+        function createFlagCanvas(drawFn) {
+            const c = document.createElement('canvas');
+            c.width = 768;
+            c.height = 1024;
+            const ctx = c.getContext('2d');
+
+            ctx.fillStyle = '#111';
+            ctx.fillRect(0, 0, c.width, c.height);
+
+            drawFn(ctx, c.width, c.height);
+            return c;
+        }
+
+        // Flag 1: Classic Jolly Roger (Skull and Crossbones)
+        const flag1 = createFlagCanvas((ctx, W, H) => {
+            const cx = W / 2;
+            const cy = H / 2;
+            const sc = H / 400; // scale relative to design height
+
+            // Skull
+            ctx.fillStyle = '#e8e0d0';
+            ctx.beginPath();
+            ctx.ellipse(cx, cy - 15 * sc, 52 * sc, 62 * sc, 0, 0, Math.PI * 2);
+            ctx.fill();
+
+            // Jaw
+            ctx.beginPath();
+            ctx.ellipse(cx, cy + 38 * sc, 38 * sc, 22 * sc, 0, 0, Math.PI);
+            ctx.fill();
+
+            // Eye sockets
+            ctx.fillStyle = '#111';
+            ctx.beginPath();
+            ctx.ellipse(cx - 20 * sc, cy - 18 * sc, 14 * sc, 16 * sc, -0.15, 0, Math.PI * 2);
+            ctx.fill();
+            ctx.beginPath();
+            ctx.ellipse(cx + 20 * sc, cy - 18 * sc, 14 * sc, 16 * sc, 0.15, 0, Math.PI * 2);
+            ctx.fill();
+
+            // Nose
+            ctx.beginPath();
+            ctx.moveTo(cx - 6 * sc, cy + 5 * sc);
+            ctx.lineTo(cx + 6 * sc, cy + 5 * sc);
+            ctx.lineTo(cx, cy + 18 * sc);
+            ctx.closePath();
+            ctx.fill();
+
+            // Teeth
+            ctx.fillStyle = '#111';
+            for (let i = -3; i <= 3; i++) {
+                ctx.fillRect(cx + i * 9 * sc - 3 * sc, cy + 30 * sc, 2 * sc, 14 * sc);
+            }
+
+            // Crossbones
+            ctx.strokeStyle = '#e8e0d0';
+            ctx.lineWidth = 12 * sc;
+            ctx.lineCap = 'round';
+
+            ctx.beginPath();
+            ctx.moveTo(cx - 85 * sc, cy + 85 * sc);
+            ctx.lineTo(cx + 85 * sc, cy - 55 * sc);
+            ctx.stroke();
+
+            ctx.beginPath();
+            ctx.moveTo(cx + 85 * sc, cy + 85 * sc);
+            ctx.lineTo(cx - 85 * sc, cy - 55 * sc);
+            ctx.stroke();
+
+            // Bone ends (knobs)
+            ctx.fillStyle = '#e8e0d0';
+            const knobs = [
+                [cx - 85 * sc, cy + 85 * sc], [cx + 85 * sc, cy - 55 * sc],
+                [cx + 85 * sc, cy + 85 * sc], [cx - 85 * sc, cy - 55 * sc]
+            ];
+            knobs.forEach(([bx, by]) => {
+                ctx.beginPath();
+                ctx.arc(bx - 6 * sc, by - 4 * sc, 9 * sc, 0, Math.PI * 2);
+                ctx.arc(bx + 6 * sc, by + 4 * sc, 9 * sc, 0, Math.PI * 2);
+                ctx.fill();
+            });
+        });
+
+        // Flag 2: Blackbeard-style (Skeleton with hourglass)
+        const flag2 = createFlagCanvas((ctx, W, H) => {
+            const cx = W / 2;
+            const cy = H / 2;
+            const sc = H / 500; // scale relative to design
+            ctx.fillStyle = '#e8e0d0';
+            ctx.strokeStyle = '#e8e0d0';
+
+            // Head (skull)
+            const headY = cy - 120 * sc;
+            ctx.beginPath();
+            ctx.ellipse(cx, headY, 32 * sc, 38 * sc, 0, 0, Math.PI * 2);
+            ctx.fill();
+
+            // Eyes
+            ctx.fillStyle = '#111';
+            ctx.beginPath();
+            ctx.ellipse(cx - 13 * sc, headY - 7 * sc, 9 * sc, 11 * sc, 0, 0, Math.PI * 2);
+            ctx.fill();
+            ctx.beginPath();
+            ctx.ellipse(cx + 13 * sc, headY - 7 * sc, 9 * sc, 11 * sc, 0, 0, Math.PI * 2);
+            ctx.fill();
+
+            // Nose
+            ctx.beginPath();
+            ctx.moveTo(cx - 4 * sc, headY + 5 * sc);
+            ctx.lineTo(cx + 4 * sc, headY + 5 * sc);
+            ctx.lineTo(cx, headY + 15 * sc);
+            ctx.closePath();
+            ctx.fill();
+
+            ctx.fillStyle = '#e8e0d0';
+
+            // Spine
+            ctx.lineWidth = 6 * sc;
+            ctx.beginPath();
+            ctx.moveTo(cx, headY + 38 * sc);
+            ctx.lineTo(cx, cy + 45 * sc);
+            ctx.stroke();
+
+            // Ribs
+            for (let i = 0; i < 4; i++) {
+                ctx.lineWidth = 5 * sc;
+                ctx.beginPath();
+                ctx.moveTo(cx - 35 * sc, headY + 60 * sc + i * 25 * sc);
+                ctx.quadraticCurveTo(cx, headY + 70 * sc + i * 25 * sc, cx + 35 * sc, headY + 60 * sc + i * 25 * sc);
+                ctx.stroke();
+            }
+
+            // Arms raised
+            ctx.lineWidth = 6 * sc;
+            ctx.beginPath();
+            ctx.moveTo(cx - 30 * sc, headY + 60 * sc);
+            ctx.lineTo(cx - 80 * sc, headY + 25 * sc);
+            ctx.lineTo(cx - 85 * sc, headY - 20 * sc);
+            ctx.stroke();
+            ctx.beginPath();
+            ctx.moveTo(cx + 30 * sc, headY + 60 * sc);
+            ctx.lineTo(cx + 80 * sc, headY + 25 * sc);
+            ctx.lineTo(cx + 85 * sc, headY - 20 * sc);
+            ctx.stroke();
+
+            // Hourglass (left hand)
+            ctx.lineWidth = 3 * sc;
+            ctx.beginPath();
+            ctx.moveTo(cx - 100 * sc, headY - 45 * sc);
+            ctx.lineTo(cx - 70 * sc, headY - 45 * sc);
+            ctx.lineTo(cx - 85 * sc, headY - 20 * sc);
+            ctx.lineTo(cx - 100 * sc, headY + 5 * sc);
+            ctx.lineTo(cx - 70 * sc, headY + 5 * sc);
+            ctx.stroke();
+            ctx.beginPath();
+            ctx.moveTo(cx - 70 * sc, headY - 45 * sc);
+            ctx.lineTo(cx - 85 * sc, headY - 20 * sc);
+            ctx.lineTo(cx - 70 * sc, headY + 5 * sc);
+            ctx.stroke();
+
+            // Spear (right hand)
+            ctx.lineWidth = 4 * sc;
+            ctx.beginPath();
+            ctx.moveTo(cx + 85 * sc, headY - 65 * sc);
+            ctx.lineTo(cx + 85 * sc, headY + 15 * sc);
+            ctx.stroke();
+            ctx.beginPath();
+            ctx.moveTo(cx + 85 * sc, headY - 65 * sc);
+            ctx.lineTo(cx + 78 * sc, headY - 45 * sc);
+            ctx.moveTo(cx + 85 * sc, headY - 65 * sc);
+            ctx.lineTo(cx + 92 * sc, headY - 45 * sc);
+            ctx.stroke();
+
+            // Pelvis
+            ctx.lineWidth = 5 * sc;
+            ctx.beginPath();
+            ctx.moveTo(cx - 30 * sc, cy + 45 * sc);
+            ctx.quadraticCurveTo(cx, cy + 65 * sc, cx + 30 * sc, cy + 45 * sc);
+            ctx.stroke();
+
+            // Legs
+            ctx.lineWidth = 6 * sc;
+            ctx.beginPath();
+            ctx.moveTo(cx - 25 * sc, cy + 55 * sc);
+            ctx.lineTo(cx - 35 * sc, cy + 120 * sc);
+            ctx.lineTo(cx - 30 * sc, cy + 145 * sc);
+            ctx.stroke();
+            ctx.beginPath();
+            ctx.moveTo(cx + 25 * sc, cy + 55 * sc);
+            ctx.lineTo(cx + 35 * sc, cy + 120 * sc);
+            ctx.lineTo(cx + 30 * sc, cy + 145 * sc);
+            ctx.stroke();
+
+            // Heart
+            ctx.fillStyle = '#cc3333';
+            ctx.beginPath();
+            ctx.moveTo(cx, cy - 15 * sc);
+            ctx.bezierCurveTo(cx - 12 * sc, cy - 30 * sc, cx - 22 * sc, cy - 20 * sc, cx, cy);
+            ctx.bezierCurveTo(cx + 22 * sc, cy - 20 * sc, cx + 12 * sc, cy - 30 * sc, cx, cy - 15 * sc);
+            ctx.fill();
+        });
+
+        // Flag 3: Calico Jack (Skull with Crossed Swords)
+        const flag3 = createFlagCanvas((ctx, W, H) => {
+            const cx = W / 2;
+            const cy = H / 2;
+            const sc = H / 400;
+
+            // Skull
+            ctx.fillStyle = '#e8e0d0';
+            ctx.beginPath();
+            ctx.ellipse(cx, cy - 10 * sc, 48 * sc, 56 * sc, 0, 0, Math.PI * 2);
+            ctx.fill();
+
+            // Jaw
+            ctx.beginPath();
+            ctx.ellipse(cx, cy + 38 * sc, 34 * sc, 20 * sc, 0, 0, Math.PI);
+            ctx.fill();
+
+            // Eye sockets
+            ctx.fillStyle = '#111';
+            ctx.beginPath();
+            ctx.ellipse(cx - 18 * sc, cy - 14 * sc, 12 * sc, 14 * sc, 0, 0, Math.PI * 2);
+            ctx.fill();
+            ctx.beginPath();
+            ctx.ellipse(cx + 18 * sc, cy - 14 * sc, 12 * sc, 14 * sc, 0, 0, Math.PI * 2);
+            ctx.fill();
+
+            // Nose
+            ctx.beginPath();
+            ctx.moveTo(cx - 5 * sc, cy + 6 * sc);
+            ctx.lineTo(cx + 5 * sc, cy + 6 * sc);
+            ctx.lineTo(cx, cy + 18 * sc);
+            ctx.closePath();
+            ctx.fill();
+
+            // Grin
+            ctx.fillStyle = '#111';
+            for (let i = -3; i <= 3; i++) {
+                ctx.fillRect(cx + i * 8 * sc - 2 * sc, cy + 30 * sc, 2 * sc, 12 * sc);
+            }
+
+            // Crossed Cutlasses
+            ctx.strokeStyle = '#e8e0d0';
+            ctx.lineWidth = 8 * sc;
+            ctx.lineCap = 'round';
+
+            ctx.beginPath();
+            ctx.moveTo(cx - 100 * sc, cy + 110 * sc);
+            ctx.lineTo(cx + 100 * sc, cy - 50 * sc);
+            ctx.stroke();
+
+            ctx.beginPath();
+            ctx.moveTo(cx + 100 * sc, cy + 110 * sc);
+            ctx.lineTo(cx - 100 * sc, cy - 50 * sc);
+            ctx.stroke();
+
+            // Blade tips
+            ctx.fillStyle = '#e8e0d0';
+            const tips = [
+                [cx - 100 * sc, cy + 110 * sc, -0.4], [cx + 100 * sc, cy - 50 * sc, -0.4],
+                [cx + 100 * sc, cy + 110 * sc, 0.4], [cx - 100 * sc, cy - 50 * sc, 0.4]
+            ];
+            tips.forEach(([tx, ty, angle]) => {
+                ctx.save();
+                ctx.translate(tx, ty);
+                ctx.rotate(angle);
+                ctx.beginPath();
+                ctx.moveTo(0, -8 * sc);
+                ctx.lineTo(12 * sc, 0);
+                ctx.lineTo(0, 8 * sc);
+                ctx.closePath();
+                ctx.fill();
+                ctx.restore();
+            });
+
+            // Sword guards
+            ctx.lineWidth = 5 * sc;
+            ctx.beginPath();
+            ctx.moveTo(cx - 25 * sc, cy + 55 * sc);
+            ctx.lineTo(cx - 5 * sc, cy + 35 * sc);
+            ctx.stroke();
+            ctx.beginPath();
+            ctx.moveTo(cx + 25 * sc, cy + 55 * sc);
+            ctx.lineTo(cx + 5 * sc, cy + 35 * sc);
+            ctx.stroke();
+        });
+
+        // Default canvas-drawn flags (used when no PNG images provided)
+        const defaultFlags = [flag1, flag2, flag3];
+
+        // --- IMAGE CONFIGURATION ---
+        // Replace these paths with your own PNG images.
+        // Set to null to use the default drawn pirate flag for that slot.
+        const FLAG_IMAGES = [
+            assetURL('blackbeard.png'),  // Flag 1: Blackbeard
+            assetURL('bonny.png'),  // Flag 2: Bonny
+            assetURL('avery.png'),  // Flag 3: Avery
+        ];
+
+        async function init() {
+        // Load PNG images where specified, fall back to drawn flags
+        const flagTextures = await Promise.all(
+            FLAG_IMAGES.map(async (src, i) => {
+                if (src) {
+                    return await loadFlagTexture(src);
+                }
+                return defaultFlags[i];
+            })
+        );
+
+        // --- 2. WebGL Setup ---
+        const canvas = document.getElementById('glcanvas');
+        const gl = canvas.getContext('webgl');
+        let aspect = 1;
+
+        function resize() {
+            canvas.width = window.innerWidth * window.devicePixelRatio;
+            canvas.height = window.innerHeight * window.devicePixelRatio;
+            gl.viewport(0, 0, canvas.width, canvas.height);
+            aspect = canvas.width / canvas.height;
+        }
+        window.addEventListener('resize', resize);
+        resize();
+
+        const vsSource = `
+            attribute vec3 a_pos;
+            attribute vec3 a_norm;
+            attribute vec2 a_uv;
+            uniform mat4 u_proj;
+            uniform mat4 u_view;
+            varying vec3 v_norm;
+            varying vec2 v_uv;
+            void main() {
+                v_norm = a_norm;
+                v_uv = a_uv;
+                gl_Position = u_proj * u_view * vec4(a_pos, 1.0);
+            }
+        `;
+
+        const fsSource = `
+            precision mediump float;
+            varying vec3 v_norm;
+            varying vec2 v_uv;
+            uniform sampler2D u_tex;
+            uniform sampler2D u_backTex;
+            void main() {
+                vec3 norm = normalize(v_norm);
+                if (!gl_FrontFacing) norm = -norm;
+
+                // Procedural fabric weave normal perturbation
+                float weaveScale = 120.0;
+                float warpThread = sin(v_uv.y * weaveScale * 6.2832);
+                float weftThread = sin(v_uv.x * weaveScale * 6.2832);
+                // Cross-hatch: warp dominates where weft is low and vice versa
+                float weavePattern = warpThread * (1.0 - abs(weftThread) * 0.5)
+                                   + weftThread * (1.0 - abs(warpThread) * 0.5);
+                // Build tangent-space perturbation
+                float nx = cos(v_uv.x * weaveScale * 6.2832) * 0.15;
+                float ny = cos(v_uv.y * weaveScale * 6.2832) * 0.15;
+                // Perturb the geometric normal
+                vec3 tangent = normalize(cross(norm, vec3(0.0, 1.0, 0.0)));
+                vec3 bitangent = cross(norm, tangent);
+                norm = normalize(norm + tangent * nx + bitangent * ny);
+
+                vec3 lightDir1 = normalize(vec3(0.4, 0.8, 0.6));
+                vec3 lightDir2 = normalize(vec3(-0.5, -0.2, 0.8));
+
+                // Hemisphere ambient: warm from above, cool from below
+                float hemi = norm.y * 0.5 + 0.5;
+                vec3 skyColor = vec3(0.35, 0.30, 0.25);
+                vec3 groundColor = vec3(0.08, 0.06, 0.04);
+                vec3 ambientColor = mix(groundColor, skyColor, hemi);
+
+                float diff1 = max(dot(norm, lightDir1), 0.0);
+                float diff2 = max(dot(norm, lightDir2), 0.0);
+                vec3 viewDir = vec3(0.0, 0.0, 1.0);
+
+                // Specular (Blinn-Phong) for slight cloth sheen
+                vec3 halfDir1 = normalize(lightDir1 + viewDir);
+                float spec1 = pow(max(dot(norm, halfDir1), 0.0), 16.0) * 0.1;
+                vec3 halfDir2 = normalize(lightDir2 + viewDir);
+                float spec2 = pow(max(dot(norm, halfDir2), 0.0), 16.0) * 0.04;
+
+                // Swap textures based on facing (winding is CW for the design side)
+                vec2 uv = v_uv;
+                vec4 texColor;
+                if (!gl_FrontFacing) {
+                    texColor = texture2D(u_tex, uv);
+                } else {
+                    texColor = texture2D(u_backTex, vec2(1.0 - uv.y, 1.0 - uv.x));
+                }
+                vec3 lighting = ambientColor + diff1 * 0.5 + diff2 * 0.2;
+                // Multiplicative shading + small additive term so dark areas still show cloth folds
+                vec3 finalColor = texColor.rgb * lighting + vec3(0.06) * (max(lighting.r, max(lighting.g, lighting.b)) - 0.3);
+                // Add specular sheen
+                finalColor += vec3(0.85, 0.8, 0.7) * (spec1 + spec2);
+
+                gl_FragColor = vec4(finalColor, texColor.a);
+            }
+        `;
+
+        function createShader(type, source) {
+            const s = gl.createShader(type);
+            gl.shaderSource(s, source);
+            gl.compileShader(s);
+            if (!gl.getShaderParameter(s, gl.COMPILE_STATUS)) {
+                console.error(gl.getShaderInfoLog(s));
+                return null;
+            }
+            return s;
+        }
+
+        const program = gl.createProgram();
+        gl.attachShader(program, createShader(gl.VERTEX_SHADER, vsSource));
+        gl.attachShader(program, createShader(gl.FRAGMENT_SHADER, fsSource));
+        gl.linkProgram(program);
+        gl.useProgram(program);
+
+        const aPos = gl.getAttribLocation(program, "a_pos");
+        const aNorm = gl.getAttribLocation(program, "a_norm");
+        const aUv = gl.getAttribLocation(program, "a_uv");
+        const uProj = gl.getUniformLocation(program, "u_proj");
+        const uView = gl.getUniformLocation(program, "u_view");
+        const uTex = gl.getUniformLocation(program, "u_tex");
+        const uBackTex = gl.getUniformLocation(program, "u_backTex");
+
+        // --- Shadow shader for planar shadows on background ---
+        const shadowVs = `
+            attribute vec3 a_pos;
+            uniform mat4 u_proj;
+            uniform mat4 u_view;
+            uniform vec3 u_lightDir;
+            uniform float u_planeZ;
+            varying float v_fade;
+            void main() {
+                // Project vertex along light direction onto the shadow plane
+                float t = (u_planeZ - a_pos.z) / u_lightDir.z;
+                // Clamp t so vertices behind the plane just land at their x,y on the plane
+                t = max(t, 0.0);
+                vec3 shadowPos = a_pos + u_lightDir * t;
+                shadowPos.z = u_planeZ;
+                // Fade out shadow for vertices near or behind the plane
+                float dist = a_pos.z - u_planeZ;
+                v_fade = smoothstep(0.0, 0.3, dist);
+                gl_Position = u_proj * u_view * vec4(shadowPos, 1.0);
+            }
+        `;
+        const shadowFs = `
+            precision mediump float;
+            varying float v_fade;
+            void main() {
+                gl_FragColor = vec4(0.0, 0.0, 0.0, 0.55 * v_fade);
+            }
+        `;
+        const shadowProgram = gl.createProgram();
+        gl.attachShader(shadowProgram, createShader(gl.VERTEX_SHADER, shadowVs));
+        gl.attachShader(shadowProgram, createShader(gl.FRAGMENT_SHADER, shadowFs));
+        gl.linkProgram(shadowProgram);
+        const aShadowPos = gl.getAttribLocation(shadowProgram, "a_pos");
+        const uShadowProj = gl.getUniformLocation(shadowProgram, "u_proj");
+        const uShadowView = gl.getUniformLocation(shadowProgram, "u_view");
+        const uShadowLightDir = gl.getUniformLocation(shadowProgram, "u_lightDir");
+        const uShadowPlaneZ = gl.getUniformLocation(shadowProgram, "u_planeZ");
+
+        // Create back-face textures (white text on dark background)
+        const FLAG_LABELS = ['Blackbeard', '', ''];
+        function createBackFaceTexture(text) {
+            const c = document.createElement('canvas');
+            c.width = 768; c.height = 1024;
+            const ctx = c.getContext('2d');
+            // Dark background matching front
+            ctx.fillStyle = '#111';
+            ctx.fillRect(0, 0, c.width, c.height);
+            if (text) {
+                ctx.save();
+                ctx.translate(c.width / 2, c.height / 2);
+                ctx.rotate(-Math.PI / 2); // 90° counterclockwise
+                ctx.fillStyle = 'rgba(255, 240, 220, 0.9)';
+                ctx.font = 'bold 72px Georgia, serif';
+                ctx.textAlign = 'center';
+                ctx.textBaseline = 'middle';
+                ctx.fillText(text, 0, 0);
+                ctx.restore();
+            }
+            const tex = gl.createTexture();
+            gl.bindTexture(gl.TEXTURE_2D, tex);
+            gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, c);
+            gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
+            gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
+            gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
+            gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+            return tex;
+        }
+        const backTextures = FLAG_LABELS.map(createBackFaceTexture);
+
+        // Load image-based back texture for first flag (Blackbeard)
+        function loadBackFaceImage(url, texSlot) {
+            const img = new Image();
+            img.onload = () => {
+                gl.bindTexture(gl.TEXTURE_2D, backTextures[texSlot]);
+                gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, img);
+                gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
+                gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
+            };
+            img.src = url;
+        }
+        loadBackFaceImage(assetURL('text-blackbeard.png'), 0);
+        loadBackFaceImage(assetURL('text-bonny.png'), 1);
+        loadBackFaceImage(assetURL('text-avery.png'), 2);
+
+        // --- Background shader for planks texture ---
+        const bgVs = `
+            attribute vec2 a_bgPos;
+            varying vec2 v_bgUv;
+            void main() {
+                v_bgUv = a_bgPos * 0.5 + 0.5;
+                gl_Position = vec4(a_bgPos, 0.999, 1.0);
+            }
+        `;
+        const bgFs = `
+            precision mediump float;
+            varying vec2 v_bgUv;
+            uniform sampler2D u_bgTex;
+            uniform vec2 u_canvasSize;
+            uniform vec2 u_bgImgSize;
+            void main() {
+                // Cover: scale image to fill canvas, crop excess
+                float canvasAspect = u_canvasSize.x / u_canvasSize.y;
+                float imgAspect = u_bgImgSize.x / u_bgImgSize.y;
+                vec2 uv = v_bgUv;
+                if (canvasAspect > imgAspect) {
+                    // Canvas wider than image: fit width, crop height
+                    float scale = imgAspect / canvasAspect;
+                    uv.y = uv.y * scale + (1.0 - scale) * 0.5;
+                } else {
+                    // Canvas taller than image: fit height, crop width
+                    float scale = canvasAspect / imgAspect;
+                    uv.x = uv.x * scale + (1.0 - scale) * 0.5;
+                }
+                vec4 texColor = texture2D(u_bgTex, uv);
+                // Hemisphere ambient for wall (normal faces camera)
+                vec3 skyColor = vec3(0.35, 0.30, 0.25);
+                vec3 groundColor = vec3(0.08, 0.06, 0.04);
+                // Wall normal is (0,0,1), hemi based on slight upward bias
+                vec3 ambient = mix(groundColor, skyColor, 0.65);
+                vec3 lightDir1 = normalize(vec3(0.4, 0.8, 0.6));
+                vec3 lightDir2 = normalize(vec3(-0.5, -0.2, 0.8));
+                float diff1 = max(dot(vec3(0.0, 0.0, 1.0), lightDir1), 0.0);
+                float diff2 = max(dot(vec3(0.0, 0.0, 1.0), lightDir2), 0.0);
+                vec3 lighting = ambient + diff1 * 0.5 + diff2 * 0.2;
+                gl_FragColor = vec4(texColor.rgb * lighting, texColor.a);
+            }
+        `;
+        const bgProgram = gl.createProgram();
+        gl.attachShader(bgProgram, createShader(gl.VERTEX_SHADER, bgVs));
+        gl.attachShader(bgProgram, createShader(gl.FRAGMENT_SHADER, bgFs));
+        gl.linkProgram(bgProgram);
+        const aBgPos = gl.getAttribLocation(bgProgram, "a_bgPos");
+        const uBgTex = gl.getUniformLocation(bgProgram, "u_bgTex");
+        const uCanvasSize = gl.getUniformLocation(bgProgram, "u_canvasSize");
+        const uBgImgSize = gl.getUniformLocation(bgProgram, "u_bgImgSize");
+        let bgImgWidth = 1, bgImgHeight = 1;
+
+        // Fullscreen quad
+        const bgBuf = gl.createBuffer();
+        gl.bindBuffer(gl.ARRAY_BUFFER, bgBuf);
+        gl.bufferData(gl.ARRAY_BUFFER, new Float32Array([-1,-1, 1,-1, -1,1, 1,1]), gl.STATIC_DRAW);
+
+        // Load planks background texture
+        const bgTexture = gl.createTexture();
+        gl.bindTexture(gl.TEXTURE_2D, bgTexture);
+        // Placeholder dark pixel until image loads
+        gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, 1, 1, 0, gl.RGBA, gl.UNSIGNED_BYTE, new Uint8Array([26,26,46,255]));
+        const bgImg = new Image();
+        bgImg.onload = () => {
+            bgImgWidth = bgImg.naturalWidth;
+            bgImgHeight = bgImg.naturalHeight;
+            gl.bindTexture(gl.TEXTURE_2D, bgTexture);
+            gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, bgImg);
+            gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
+            gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
+            gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
+            gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+        };
+        bgImg.src = assetURL('planks.webp');
+
+        // Create textures for each flag
+        const glTextures = flagTextures.map(texCanvas => {
+            const tex = gl.createTexture();
+            gl.bindTexture(gl.TEXTURE_2D, tex);
+            gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, texCanvas);
+            gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
+            gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
+            gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
+            gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+            return tex;
+        });
+
+        // --- 3. Physics Setup for 3 Flags ---
+        const numX = 20;
+        const numY = 30;
+        const numParticles = numX * numY;
+        const flagWidth = 3.0;
+        const flagHeight = 4.0;
+        const flagSpacing = 3.6;
+        const flagOffsets = [-flagSpacing, 0, flagSpacing];
+
+        const flags = [];
+
+        for (let f = 0; f < 3; f++) {
+            const offsetX = flagOffsets[f];
+            const particles = [];
+            const posData = new Float32Array(numParticles * 3);
+            const normalData = new Float32Array(numParticles * 3);
+            const uvData = new Float32Array(numParticles * 2);
+
+            for (let y = 0; y < numY; y++) {
+                for (let x = 0; x < numX; x++) {
+                    let px = (x / (numX - 1) - 0.5) * flagWidth + offsetX;
+                    let py = -(y / (numY - 1)) * flagHeight;
+                    let pz = 0;
+                    let i = y * numX + x;
+                    particles.push({ x: px, y: py, z: pz, ox: px, oy: py, oz: pz });
+                    uvData[i * 2] = x / (numX - 1);
+                    uvData[i * 2 + 1] = y / (numY - 1);
+                }
+            }
+
+            const constraints = [];
+            function addC(i1, i2) {
+                let dx = particles[i2].x - particles[i1].x;
+                let dy = particles[i2].y - particles[i1].y;
+                let dz = particles[i2].z - particles[i1].z;
+                constraints.push({ p1: i1, p2: i2, rest: Math.sqrt(dx * dx + dy * dy + dz * dz) });
+            }
+
+            for (let y = 0; y < numY; y++) {
+                for (let x = 0; x < numX; x++) {
+                    let i = y * numX + x;
+                    if (x < numX - 1) addC(i, i + 1);
+                    if (y < numY - 1) addC(i, i + numX);
+                    if (x < numX - 1 && y < numY - 1) {
+                        addC(i, i + numX + 1);
+                        addC(i + 1, i + numX);
+                    }
+                    if (x < numX - 2) addC(i, i + 2);
+                    if (y < numY - 2) addC(i, i + numX * 2);
+                }
+            }
+
+            const indices = [];
+            for (let y = 0; y < numY - 1; y++) {
+                for (let x = 0; x < numX - 1; x++) {
+                    let i = y * numX + x;
+                    indices.push(i, i + 1, i + numX);
+                    indices.push(i + 1, i + numX + 1, i + numX);
+                }
+            }
+
+            const posBuf = gl.createBuffer();
+            const normBuf = gl.createBuffer();
+            const uvBuf = gl.createBuffer();
+            gl.bindBuffer(gl.ARRAY_BUFFER, uvBuf);
+            gl.bufferData(gl.ARRAY_BUFFER, uvData, gl.STATIC_DRAW);
+
+            const idxBuf = gl.createBuffer();
+            gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, idxBuf);
+            gl.bufferData(gl.ELEMENT_ARRAY_BUFFER, new Uint16Array(indices), gl.STATIC_DRAW);
+
+            flags.push({
+                particles, constraints, indices,
+                posData, normalData, uvData,
+                posBuf, normBuf, uvBuf, idxBuf,
+                offsetX, grabbedIndex: -1, collisionCooldown: 0
+            });
+        }
+
+        gl.enable(gl.DEPTH_TEST);
+
+        // --- Rope shader and geometry ---
+        const ropeVs = `
+            attribute vec3 a_pos;
+            attribute vec3 a_norm;
+            uniform mat4 u_proj;
+            uniform mat4 u_view;
+            varying vec3 v_norm;
+            void main() {
+                v_norm = a_norm;
+                gl_Position = u_proj * u_view * vec4(a_pos, 1.0);
+            }
+        `;
+        const ropeFs = `
+            precision mediump float;
+            varying vec3 v_norm;
+            void main() {
+                vec3 norm = normalize(v_norm);
+                vec3 lightDir1 = normalize(vec3(0.4, 0.8, 0.6));
+                vec3 lightDir2 = normalize(vec3(-0.5, -0.2, 0.8));
+                vec3 viewDir = vec3(0.0, 0.0, 1.0);
+
+                // Hemisphere ambient: warm from above, cool from below
+                float hemi = norm.y * 0.5 + 0.5;
+                vec3 skyColor = vec3(0.35, 0.30, 0.25);
+                vec3 groundColor = vec3(0.08, 0.06, 0.04);
+                vec3 ambient = mix(groundColor, skyColor, hemi);
+
+                // Diffuse
+                float diff1 = max(dot(norm, lightDir1), 0.0);
+                float diff2 = max(dot(norm, lightDir2), 0.0);
+
+                // Specular (Blinn-Phong) for fiber sheen
+                vec3 halfDir1 = normalize(lightDir1 + viewDir);
+                float spec1 = pow(max(dot(norm, halfDir1), 0.0), 24.0) * 0.3;
+                vec3 halfDir2 = normalize(lightDir2 + viewDir);
+                float spec2 = pow(max(dot(norm, halfDir2), 0.0), 24.0) * 0.1;
+
+                vec3 ropeColor = vec3(0.62, 0.47, 0.34); // #9e7856 tan
+                // Slight warm/cool variation based on normal for strand depth
+                ropeColor += norm.y * vec3(0.04, 0.02, -0.01);
+
+                vec3 finalColor = ropeColor * (ambient * 0.5 + diff1 * 0.28 + diff2 * 0.1)
+                                + vec3(0.9, 0.8, 0.65) * (spec1 + spec2) * 0.5;
+                gl_FragColor = vec4(finalColor, 1.0);
+            }
+        `;
+        const ropeProgram = gl.createProgram();
+        gl.attachShader(ropeProgram, createShader(gl.VERTEX_SHADER, ropeVs));
+        gl.attachShader(ropeProgram, createShader(gl.FRAGMENT_SHADER, ropeFs));
+        gl.linkProgram(ropeProgram);
+        const aRopePos = gl.getAttribLocation(ropeProgram, "a_pos");
+        const aRopeNorm = gl.getAttribLocation(ropeProgram, "a_norm");
+        const uRopeProj = gl.getUniformLocation(ropeProgram, "u_proj");
+        const uRopeView = gl.getUniformLocation(ropeProgram, "u_view");
+
+        // Generate twisted rope geometry (3 strands spiraling around center)
+        const strandCount = 3;
+        const strandSides = 6;
+        const ropeRadius = 0.055; // overall rope radius
+        const strandRadius = 0.032; // individual strand radius
+        const twistRate = 18.0; // twists per unit length
+        const ropeOverhang = 0.3;
+        const ropeSegments = 60; // high detail for smooth twist
+        const ropeBuffers = [];
+
+        function buildTube(pathFn, numSegs, tubeRadius, sides) {
+            const verts = [], norms = [], idxs = [];
+            for (let i = 0; i <= numSegs; i++) {
+                const t = i / numSegs;
+                const p = pathFn(t);
+                // Compute tangent via finite difference
+                const dt = 0.001;
+                const pNext = pathFn(Math.min(t + dt, 1.0));
+                const pPrev = pathFn(Math.max(t - dt, 0.0));
+                let tx = pNext.x - pPrev.x, ty = pNext.y - pPrev.y, tz = pNext.z - pPrev.z;
+                const tLen = Math.sqrt(tx*tx + ty*ty + tz*tz);
+                tx /= tLen; ty /= tLen; tz /= tLen;
+                // Basis vectors perpendicular to tangent
+                let bx = -tz, by = 0, bz = tx;
+                let bLen = Math.sqrt(bx*bx + by*by + bz*bz);
+                if (bLen < 0.001) { bx = 0; by = 0; bz = 1; bLen = 1; }
+                bx /= bLen; by /= bLen; bz /= bLen;
+                let cx = ty * bz - tz * by, cy = tz * bx - tx * bz, cz = tx * by - ty * bx;
+
+                for (let s = 0; s < sides; s++) {
+                    const angle = (s / sides) * Math.PI * 2;
+                    const cosA = Math.cos(angle), sinA = Math.sin(angle);
+                    const nx = bx * cosA + cx * sinA;
+                    const ny = by * cosA + cy * sinA;
+                    const nz = bz * cosA + cz * sinA;
+                    verts.push(p.x + nx * tubeRadius, p.y + ny * tubeRadius, p.z + nz * tubeRadius);
+                    norms.push(nx, ny, nz);
+                }
+                if (i < numSegs) {
+                    for (let s = 0; s < sides; s++) {
+                        const s1 = (s + 1) % sides;
+                        const base = i * sides, next = (i + 1) * sides;
+                        idxs.push(base + s, next + s, base + s1);
+                        idxs.push(base + s1, next + s, next + s1);
+                    }
+                }
+            }
+            return { verts, norms, idxs };
+        }
+
+        for (let f = 0; f < 3; f++) {
+            const ox = flagOffsets[f];
+            const startX = -flagWidth / 2 - ropeOverhang + ox;
+            const endX = flagWidth / 2 + ropeOverhang + ox;
+            const ropeLen = endX - startX;
+
+            const allVerts = [], allNorms = [], allIdxs = [];
+            let vertOffset = 0;
+
+            for (let strand = 0; strand < strandCount; strand++) {
+                const phaseOffset = (strand / strandCount) * Math.PI * 2;
+                const strandPath = (t) => {
+                    const px = startX + ropeLen * t;
+                    const angle = t * ropeLen * twistRate + phaseOffset;
+                    const sag = Math.sin(t * Math.PI) * 0.04;
+                    return {
+                        x: px,
+                        y: -sag + Math.cos(angle) * ropeRadius,
+                        z: Math.sin(angle) * ropeRadius
+                    };
+                };
+                const tube = buildTube(strandPath, ropeSegments, strandRadius, strandSides);
+                allVerts.push(...tube.verts);
+                allNorms.push(...tube.norms);
+                for (const idx of tube.idxs) allIdxs.push(idx + vertOffset);
+                vertOffset += (ropeSegments + 1) * strandSides;
+            }
+
+            const rPosBuf = gl.createBuffer();
+            gl.bindBuffer(gl.ARRAY_BUFFER, rPosBuf);
+            gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(allVerts), gl.STATIC_DRAW);
+            const rNormBuf = gl.createBuffer();
+            gl.bindBuffer(gl.ARRAY_BUFFER, rNormBuf);
+            gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(allNorms), gl.STATIC_DRAW);
+            const rIdxBuf = gl.createBuffer();
+            gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, rIdxBuf);
+            gl.bufferData(gl.ELEMENT_ARRAY_BUFFER, new Uint16Array(allIdxs), gl.STATIC_DRAW);
+            ropeBuffers.push({ posBuf: rPosBuf, normBuf: rNormBuf, idxBuf: rIdxBuf, count: allIdxs.length });
+        }
+
+        // Matrices
+        const projMatrix = new Float32Array(16);
+        const viewMatrix = new Float32Array(16);
+
+        function setPerspective(out, fovy, aspect, near, far) {
+            let f = 1.0 / Math.tan(fovy / 2);
+            let nf = 1 / (near - far);
+            out.fill(0);
+            out[0] = f / aspect;
+            out[5] = f;
+            out[10] = (far + near) * nf;
+            out[11] = -1;
+            out[14] = (2 * far * near) * nf;
+        }
+
+        function setTranslation(out, x, y, z) {
+            out.fill(0);
+            out[0] = 1; out[5] = 1; out[10] = 1; out[15] = 1;
+            out[12] = x; out[13] = y; out[14] = z;
+        }
+
+        // Camera
+        const camPos = { x: 0, y: -1.5, z: 14.0 };
+        const fov = 45 * Math.PI / 180;
+
+        // --- 4. Interaction ---
+        let pointerX = 0, pointerY = 0;
+        let isDown = false;
+        let activeFlag = -1;
+        let grabDepth = 0;
+        let grabTarget = { x: 0, y: 0, z: 0 };
+        const indicator = document.getElementById('indicator');
+
+        function getRay() {
+            let tanFov = Math.tan(fov / 2);
+            let dx = pointerX * aspect * tanFov;
+            let dy = pointerY * tanFov;
+            let dz = -1;
+            let len = Math.sqrt(dx * dx + dy * dy + dz * dz);
+            return {
+                origin: { x: camPos.x, y: camPos.y, z: camPos.z },
+                dir: { x: dx / len, y: dy / len, z: dz / len }
+            };
+        }
+
+        function updatePointer(e) {
+            pointerX = (e.clientX / window.innerWidth) * 2 - 1;
+            pointerY = -(e.clientY / window.innerHeight) * 2 + 1;
+        }
+
+        window.addEventListener('pointerdown', e => {
+            e.preventDefault();
+            isDown = true;
+            updatePointer(e);
+            let ray = getRay();
+            let minDist = Infinity;
+            let bestFlag = -1;
+            let bestIdx = -1;
+
+            for (let f = 0; f < 3; f++) {
+                const flag = flags[f];
+                for (let i = 0; i < numParticles; i++) {
+                    let p = flag.particles[i];
+                    let vx = p.x - ray.origin.x;
+                    let vy = p.y - ray.origin.y;
+                    let vz = p.z - ray.origin.z;
+                    let t = vx * ray.dir.x + vy * ray.dir.y + vz * ray.dir.z;
+                    if (t < 0) continue; // particle behind camera
+                    let px = ray.origin.x + ray.dir.x * t;
+                    let py = ray.origin.y + ray.dir.y * t;
+                    let pz = ray.origin.z + ray.dir.z * t;
+                    let dx = p.x - px;
+                    let dy = p.y - py;
+                    let dz = p.z - pz;
+                    let dist = Math.sqrt(dx * dx + dy * dy + dz * dz);
+                    if (dist < minDist && dist < 0.5) {
+                        minDist = dist;
+                        bestFlag = f;
+                        bestIdx = i;
+                        grabDepth = t;
+                    }
+                }
+            }
+
+            if (bestIdx !== -1) {
+                activeFlag = bestFlag;
+                flags[bestFlag].grabbedIndex = bestIdx;
+                let gp = flags[bestFlag].particles[bestIdx];
+                grabTarget.x = gp.x; grabTarget.y = gp.y; grabTarget.z = gp.z;
+                indicator.style.display = 'block';
+                indicator.style.left = e.clientX + 'px';
+                indicator.style.top = e.clientY + 'px';
+            }
+        });
+
+        window.addEventListener('pointermove', e => {
+            updatePointer(e);
+            if (activeFlag !== -1) {
+                let ray = getRay();
+                let flag = flags[activeFlag];
+                let p = flag.particles[flag.grabbedIndex];
+                let targetX = ray.origin.x + ray.dir.x * grabDepth;
+                let targetY = ray.origin.y + ray.dir.y * grabDepth;
+                let targetZ = ray.origin.z + ray.dir.z * grabDepth;
+                // Limit grab distance: find nearest top-row pin and clamp
+                let col = flag.grabbedIndex % numX;
+                let anchor = flag.particles[col]; // top-row particle in same column
+                let dx = targetX - anchor.x;
+                let dy = targetY - anchor.y;
+                let dz = targetZ - anchor.z;
+                let dist = Math.sqrt(dx * dx + dy * dy + dz * dz);
+                let maxDist = flagHeight * 1.05; // max reach = flag length + 5%
+                if (dist > maxDist) {
+                    let scale = maxDist / dist;
+                    targetX = anchor.x + dx * scale;
+                    targetY = anchor.y + dy * scale;
+                    targetZ = anchor.z + dz * scale;
+                }
+                // Bias grab forward (toward camera) so flag lifts up
+                targetZ = Math.max(targetZ, 1.0);
+                grabTarget.x = targetX; grabTarget.y = targetY; grabTarget.z = targetZ;
+                indicator.style.left = e.clientX + 'px';
+                indicator.style.top = e.clientY + 'px';
+            }
+        });
+
+        const release = () => {
+            isDown = false;
+            if (activeFlag !== -1) {
+                flags[activeFlag].collisionCooldown = 60; // keep collision active for ~1 second after release
+                flags[activeFlag].grabbedIndex = -1;
+            }
+            activeFlag = -1;
+            indicator.style.display = 'none';
+        };
+        window.addEventListener('pointerup', release);
+        window.addEventListener('pointercancel', release);
+
+        // --- 5. Main Loop ---
+        let time = 0;
+        function render() {
+            time += 0.016;
+
+            for (let f = 0; f < 3; f++) {
+                const flag = flags[f];
+                const { particles, constraints, indices, posData, normalData, grabbedIndex, collisionCooldown } = flag;
+
+                // Wind with slight per-flag variation
+                let windPhase = f * 1.2;
+                let windX = Math.sin(time * 1.5 + windPhase) * 0.002;
+                let windZ = Math.cos(time * 1.1 + windPhase) * 0.002;
+
+                const substeps = grabbedIndex >= 0 ? 3 : 1;
+                const subDamp = grabbedIndex >= 0 ? 0.97 : 0.985;
+                const subGravity = -0.007 / substeps;
+                const subWindScale = 1.0 / substeps;
+
+                for (let sub = 0; sub < substeps; sub++) {
+
+                for (let i = 0; i < numParticles; i++) {
+                    if (i < numX) continue;
+                    let p = particles[i];
+                    let vx = (p.x - p.ox) * subDamp;
+                    let vy = (p.y - p.oy) * subDamp;
+                    let vz = (p.z - p.oz) * subDamp;
+                    p.ox = p.x; p.oy = p.y; p.oz = p.z;
+                    let windFactor = (p.y / -flagHeight);
+                    p.x += vx + windX * windFactor * subWindScale;
+                    p.y += vy + subGravity;
+                    p.z += vz + windZ * windFactor * subWindScale;
+                    // During drag, push cloth forward (toward camera) so it lifts up
+                    if (grabbedIndex >= 0 && p.z < 0.5) {
+                        p.z += 0.008 / substeps;
+                    }
+                }
+
+                // Soft grab: pull grabbed particle + neighbors toward mouse target
+                if (grabbedIndex >= 0) {
+                    let gr = Math.floor(grabbedIndex / numX);
+                    let gc = grabbedIndex % numX;
+                    let grabRadius = 3; // affect 3-particle radius
+                    for (let dy = -grabRadius; dy <= grabRadius; dy++) {
+                        for (let dx = -grabRadius; dx <= grabRadius; dx++) {
+                            let r = gr + dy, c = gc + dx;
+                            if (r < 1 || r >= numY || c < 0 || c >= numX) continue;
+                            let idx = r * numX + c;
+                            let p = particles[idx];
+                            let d = Math.sqrt(dx * dx + dy * dy);
+                            let strength = Math.max(0, 1.0 - d / (grabRadius + 1));
+                            strength *= strength; // quadratic falloff
+                            strength *= 0.6; // overall grab stiffness
+                            if (idx === grabbedIndex) strength = 0.7;
+                            p.x += (grabTarget.x - p.x) * strength;
+                            p.y += (grabTarget.y - p.y) * strength;
+                            p.z += (grabTarget.z - p.z) * strength;
+                            p.ox = p.x; p.oy = p.y; p.oz = p.z;
+                        }
+                    }
+                }
+
+                const iterations = 12;
+                const maxStretch = 1.1; // allow 10% stretch max
+                for (let iter = 0; iter < iterations; iter++) {
+                    for (let i = 0; i < constraints.length; i++) {
+                        let c = constraints[i];
+                        let p1 = particles[c.p1];
+                        let p2 = particles[c.p2];
+                        let dx = p2.x - p1.x;
+                        let dy = p2.y - p1.y;
+                        let dz = p2.z - p1.z;
+                        let dist = Math.sqrt(dx * dx + dy * dy + dz * dz);
+                        let w1 = c.p1 < numX ? 0 : (c.p1 === grabbedIndex ? 0.3 : 1);
+                        let w2 = c.p2 < numX ? 0 : (c.p2 === grabbedIndex ? 0.3 : 1);
+                        let wSum = w1 + w2;
+                        if (wSum > 0) {
+                            let maxDist = c.rest * maxStretch;
+                            let targetDist = dist > maxDist ? maxDist : c.rest;
+                            let diff = (dist - targetDist) / (dist * wSum);
+                            let ox = dx * diff;
+                            let oy = dy * diff;
+                            let oz = dz * diff;
+                            if (w1) { p1.x += ox; p1.y += oy; p1.z += oz; }
+                            if (w2) { p2.x -= ox; p2.y -= oy; p2.z -= oz; }
+                        }
+                    }
+                }
+
+                } // end substeps
+
+                // Self-collision: active during drag + cooldown after release
+                if (grabbedIndex >= 0 || flag.collisionCooldown > 0) {
+                if (flag.collisionCooldown > 0) flag.collisionCooldown--;
+                // spatial-hash accelerated thickness repulsion
+                const thickness = 0.14;
+                const thickSq = thickness * thickness;
+                const cellSize = thickness;
+                const hashMap = new Map();
+                function hashKey(cx, cy, cz) { return cx + ',' + cy + ',' + cz; }
+                // Build spatial hash
+                for (let i = 0; i < numParticles; i++) {
+                    let p = particles[i];
+                    let cx = Math.floor(p.x / cellSize);
+                    let cy = Math.floor(p.y / cellSize);
+                    let cz = Math.floor(p.z / cellSize);
+                    let key = hashKey(cx, cy, cz);
+                    let bucket = hashMap.get(key);
+                    if (!bucket) { bucket = []; hashMap.set(key, bucket); }
+                    bucket.push(i);
+                }
+                // Check neighboring cells
+                for (let i = 0; i < numParticles; i++) {
+                    if (i < numX) continue;
+                    let pi = particles[i];
+                    let ri = Math.floor(i / numX);
+                    let ci = i % numX;
+                    let cx = Math.floor(pi.x / cellSize);
+                    let cy = Math.floor(pi.y / cellSize);
+                    let cz = Math.floor(pi.z / cellSize);
+                    for (let ox = -1; ox <= 1; ox++) {
+                        for (let oy = -1; oy <= 1; oy++) {
+                            for (let oz = -1; oz <= 1; oz++) {
+                                let bucket = hashMap.get(hashKey(cx + ox, cy + oy, cz + oz));
+                                if (!bucket) continue;
+                                for (let k = 0; k < bucket.length; k++) {
+                                    let j = bucket[k];
+                                    if (j <= i) continue;
+                                    let rj = Math.floor(j / numX);
+                                    let cj = j % numX;
+                                    if (Math.abs(ri - rj) <= 2 && Math.abs(ci - cj) <= 2) continue;
+                                    let pj = particles[j];
+                                    let dx = pj.x - pi.x;
+                                    let dy = pj.y - pi.y;
+                                    let dz = pj.z - pi.z;
+                                    let distSq = dx * dx + dy * dy + dz * dz;
+                                    if (distSq < thickSq && distSq > 0.0001) {
+                                        let dist = Math.sqrt(distSq);
+                                        let push = (thickness - dist) * 0.5;
+                                        let nx = dx / dist;
+                                        let ny = dy / dist;
+                                        let nz = dz / dist;
+                                        let w1 = i < numX ? 0 : (i === grabbedIndex ? 0.3 : 1);
+                                        let w2 = j < numX ? 0 : (j === grabbedIndex ? 0.3 : 1);
+                                        let wSum = w1 + w2;
+                                        if (wSum > 0) {
+                                            let f = push / wSum;
+                                            if (w1) { pi.x -= nx * f; pi.y -= ny * f; pi.z -= nz * f; }
+                                            if (w2) { pj.x += nx * f; pj.y += ny * f; pj.z += nz * f; }
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+                } // end grabbedIndex check
+
+                // Wall collision: prevent particles from passing behind the plank wall
+                const wallZ = -0.2;
+                for (let i = 0; i < numParticles; i++) {
+                    let p = particles[i];
+                    if (p.z < wallZ) {
+                        p.z = wallZ;
+                        p.oz = wallZ; // kill velocity into the wall
+                    }
+                }
+
+                // Update positions & normals
+                normalData.fill(0);
+                for (let i = 0; i < numParticles; i++) {
+                    let p = particles[i];
+                    posData[i * 3] = p.x;
+                    posData[i * 3 + 1] = p.y;
+                    posData[i * 3 + 2] = p.z;
+                }
+                for (let i = 0; i < indices.length; i += 3) {
+                    let i1 = indices[i], i2 = indices[i + 1], i3 = indices[i + 2];
+                    let v1x = posData[i1 * 3], v1y = posData[i1 * 3 + 1], v1z = posData[i1 * 3 + 2];
+                    let v2x = posData[i2 * 3], v2y = posData[i2 * 3 + 1], v2z = posData[i2 * 3 + 2];
+                    let v3x = posData[i3 * 3], v3y = posData[i3 * 3 + 1], v3z = posData[i3 * 3 + 2];
+                    let dx1 = v2x - v1x, dy1 = v2y - v1y, dz1 = v2z - v1z;
+                    let dx2 = v3x - v1x, dy2 = v3y - v1y, dz2 = v3z - v1z;
+                    let nx = dy1 * dz2 - dz1 * dy2;
+                    let ny = dz1 * dx2 - dx1 * dz2;
+                    let nz = dx1 * dy2 - dy1 * dx2;
+                    normalData[i1 * 3] += nx; normalData[i1 * 3 + 1] += ny; normalData[i1 * 3 + 2] += nz;
+                    normalData[i2 * 3] += nx; normalData[i2 * 3 + 1] += ny; normalData[i2 * 3 + 2] += nz;
+                    normalData[i3 * 3] += nx; normalData[i3 * 3 + 1] += ny; normalData[i3 * 3 + 2] += nz;
+                }
+            }
+
+            // Render
+            gl.clearColor(0.05, 0.04, 0.03, 1.0);
+            gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
+
+            // Draw background planks
+            gl.disable(gl.DEPTH_TEST);
+            gl.useProgram(bgProgram);
+            gl.bindBuffer(gl.ARRAY_BUFFER, bgBuf);
+            gl.enableVertexAttribArray(aBgPos);
+            gl.vertexAttribPointer(aBgPos, 2, gl.FLOAT, false, 0, 0);
+            gl.activeTexture(gl.TEXTURE0);
+            gl.bindTexture(gl.TEXTURE_2D, bgTexture);
+            gl.uniform1i(uBgTex, 0);
+            gl.uniform2f(uCanvasSize, canvas.width, canvas.height);
+            gl.uniform2f(uBgImgSize, bgImgWidth, bgImgHeight);
+            gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
+            gl.disableVertexAttribArray(aBgPos);
+            gl.enable(gl.DEPTH_TEST);
+            gl.clear(gl.DEPTH_BUFFER_BIT);
+
+            setPerspective(projMatrix, fov, aspect, 0.1, 100.0);
+            setTranslation(viewMatrix, -camPos.x, -camPos.y, -camPos.z);
+
+            // --- Draw shadows ---
+            gl.useProgram(shadowProgram);
+            gl.uniformMatrix4fv(uShadowProj, false, projMatrix);
+            gl.uniformMatrix4fv(uShadowView, false, viewMatrix);
+            gl.uniform3f(uShadowLightDir, 0.4, -0.5, -1.0); // light from above, shadows fall down
+            gl.uniform1f(uShadowPlaneZ, -0.2); // shadow plane just behind flags (close to wall)
+            gl.enable(gl.BLEND);
+            gl.blendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA);
+            gl.depthMask(false);
+            for (let f = 0; f < 3; f++) {
+                const flag = flags[f];
+                gl.bindBuffer(gl.ARRAY_BUFFER, flag.posBuf);
+                gl.enableVertexAttribArray(aShadowPos);
+                gl.vertexAttribPointer(aShadowPos, 3, gl.FLOAT, false, 0, 0);
+                gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, flag.idxBuf);
+                gl.drawElements(gl.TRIANGLES, flag.indices.length, gl.UNSIGNED_SHORT, 0);
+                gl.disableVertexAttribArray(aShadowPos);
+            }
+            gl.depthMask(true);
+            gl.disable(gl.BLEND);
+
+            // --- Draw flags ---
+            gl.useProgram(program);
+            gl.uniformMatrix4fv(uProj, false, projMatrix);
+            gl.uniformMatrix4fv(uView, false, viewMatrix);
+
+            for (let f = 0; f < 3; f++) {
+                const flag = flags[f];
+
+                gl.activeTexture(gl.TEXTURE0);
+                gl.bindTexture(gl.TEXTURE_2D, glTextures[f]);
+                gl.uniform1i(uTex, 0);
+                gl.activeTexture(gl.TEXTURE1);
+                gl.bindTexture(gl.TEXTURE_2D, backTextures[f]);
+                gl.uniform1i(uBackTex, 1);
+
+                gl.bindBuffer(gl.ARRAY_BUFFER, flag.posBuf);
+                gl.bufferData(gl.ARRAY_BUFFER, flag.posData, gl.DYNAMIC_DRAW);
+                gl.enableVertexAttribArray(aPos);
+                gl.vertexAttribPointer(aPos, 3, gl.FLOAT, false, 0, 0);
+
+                gl.bindBuffer(gl.ARRAY_BUFFER, flag.normBuf);
+                gl.bufferData(gl.ARRAY_BUFFER, flag.normalData, gl.DYNAMIC_DRAW);
+                gl.enableVertexAttribArray(aNorm);
+                gl.vertexAttribPointer(aNorm, 3, gl.FLOAT, false, 0, 0);
+
+                gl.bindBuffer(gl.ARRAY_BUFFER, flag.uvBuf);
+                gl.enableVertexAttribArray(aUv);
+                gl.vertexAttribPointer(aUv, 2, gl.FLOAT, false, 0, 0);
+
+                gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, flag.idxBuf);
+                gl.drawElements(gl.TRIANGLES, flag.indices.length, gl.UNSIGNED_SHORT, 0);
+            }
+
+            // --- Draw ropes ---
+            gl.useProgram(ropeProgram);
+            gl.uniformMatrix4fv(uRopeProj, false, projMatrix);
+            gl.uniformMatrix4fv(uRopeView, false, viewMatrix);
+            for (let f = 0; f < 3; f++) {
+                const rb = ropeBuffers[f];
+                gl.bindBuffer(gl.ARRAY_BUFFER, rb.posBuf);
+                gl.enableVertexAttribArray(aRopePos);
+                gl.vertexAttribPointer(aRopePos, 3, gl.FLOAT, false, 0, 0);
+                gl.bindBuffer(gl.ARRAY_BUFFER, rb.normBuf);
+                gl.enableVertexAttribArray(aRopeNorm);
+                gl.vertexAttribPointer(aRopeNorm, 3, gl.FLOAT, false, 0, 0);
+                gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, rb.idxBuf);
+                gl.drawElements(gl.TRIANGLES, rb.count, gl.UNSIGNED_SHORT, 0);
+            }
+
+            requestAnimationFrame(render);
+        }
+
+        render();
+        } // end init()
+
+        init();
+    </script>
+</body>
+</html>
