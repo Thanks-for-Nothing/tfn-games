@@ -3847,7 +3847,6 @@ void main() {
 uniform float uTime;
 varying vec3 vWorldPos;
 varying vec3 vNormal;
-varying float vFoam;
 
 vec3 gerstner(vec3 pos, vec2 dir, float steepness, float wavelength, float t) {
   float k = 6.28318 / wavelength;
@@ -3874,8 +3873,6 @@ void main() {
   vec3 p = position;
   vec3 displacement = allWaves(p, t);
   p += displacement;
-  vFoam = max(0.0, displacement.y * 1.5 - 0.6);
-
   float e = 0.2;
   vec3 px1 = position + vec3(e, 0.0, 0.0) + allWaves(position + vec3(e, 0.0, 0.0), t);
   vec3 px2 = position - vec3(e, 0.0, 0.0) + allWaves(position - vec3(e, 0.0, 0.0), t);
@@ -3893,8 +3890,6 @@ uniform vec3 uSunDir;
 uniform vec3 uCamPos;
 varying vec3 vWorldPos;
 varying vec3 vNormal;
-varying float vFoam;
-
 vec3 sky(vec3 rd) {
   float t = max(rd.y, 0.0);
   vec3 col = mix(vec3(0.55, 0.7, 0.85), vec3(0.05, 0.15, 0.4), pow(t, 0.5));
@@ -3921,8 +3916,6 @@ void main() {
   vec3 col = mix(waterCol, reflColor, fresnel);
   col += vec3(1.0, 0.9, 0.7) * spec * 2.0;
   col += scatter * 0.3;
-
-  col = mix(col, vec3(0.8, 0.85, 0.9), smoothstep(0.0, 0.5, vFoam) * 0.5);
 
   float dist = length(vWorldPos - uCamPos);
   float fog = 1.0 - exp(-0.00015 * dist * dist);
