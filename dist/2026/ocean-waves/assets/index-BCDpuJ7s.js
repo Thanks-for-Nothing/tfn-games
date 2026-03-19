@@ -3886,15 +3886,16 @@ void main() {
   col += vec3(0.9, 0.92, 1.0) * pow(moon, 400.0) * 2.0 * uNight;
   col += vec3(0.2, 0.25, 0.4) * pow(moon, 6.0) * 0.2 * uNight;
 
-  // Stars (night only) — use spherical coords for stable positions
-  if (rd.y > 0.02) {
-    float theta = acos(rd.y);
-    float phi = atan(rd.z, rd.x);
-    vec2 starUV = floor(vec2(phi * 400.0, theta * 400.0));
-    float star = step(0.998, hash(starUV));
-    float twinkle = 0.7 + 0.3 * sin(uTime * 2.0 + hash(starUV * 0.5) * 6.28);
-    float brightness = hash(starUV * 1.7) * 0.5 + 0.5;
-    col += vec3(star * twinkle * brightness) * uNight * smoothstep(0.02, 0.15, rd.y);
+  // Stars (night only) — 3D direction hash, no grid artifacts
+  if (rd.y > 0.01) {
+    // Quantize direction on the unit sphere at a fixed resolution
+    vec3 starDir = normalize(rd) * 500.0;
+    vec3 starCell = floor(starDir);
+    float h = fract(sin(dot(starCell, vec3(127.1, 311.7, 74.7))) * 43758.5453);
+    float isStar = step(0.985, h);
+    float twinkle = 0.7 + 0.3 * sin(uTime * 1.5 + h * 100.0);
+    float brightness = fract(h * 17.3) * 0.6 + 0.4;
+    col += vec3(isStar * twinkle * brightness) * uNight * smoothstep(0.01, 0.1, rd.y);
   }
 
   // Clouds — extend slightly below horizon
