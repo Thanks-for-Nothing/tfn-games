@@ -93,8 +93,11 @@ void main() {
 
 export const oceanVertexShader = `
 uniform float uTime;
+uniform vec3 uSplashPos;
+uniform float uSplashStrength;
 varying vec3 vWorldPos;
 varying vec3 vNormal;
+varying float vSplashDist;
 
 vec3 gerstner(vec3 pos, vec2 dir, float steepness, float wavelength, float t) {
   float k = 6.28318 / wavelength;
@@ -120,6 +123,16 @@ void main() {
   float t = uTime;
   vec3 p = position;
   vec3 displacement = allWaves(p, t);
+
+  // Splash displacement near dolphin
+  vec2 splashDelta = position.xz - uSplashPos.xz;
+  float sDist = length(splashDelta);
+  float splash = uSplashStrength * exp(-sDist * sDist * 0.8);
+  // Ripple ring
+  splash += uSplashStrength * 0.3 * sin(sDist * 8.0 - uTime * 12.0) * exp(-sDist * sDist * 0.3);
+  displacement.y += splash;
+  vSplashDist = sDist;
+
   p += displacement;
   float e = 0.2;
   vec3 px1 = position + vec3(e, 0.0, 0.0) + allWaves(position + vec3(e, 0.0, 0.0), t);
@@ -139,8 +152,10 @@ export const oceanFragmentShader = `
 uniform vec3 uSunDir;
 uniform vec3 uCamPos;
 uniform float uNight;
+uniform float uSplashStrength;
 varying vec3 vWorldPos;
 varying vec3 vNormal;
+varying float vSplashDist;
 
 vec3 sky(vec3 rd) {
   float t = max(rd.y, 0.0);
@@ -197,6 +212,11 @@ void main() {
   col += vec3(0.06, 0.08, 0.12) * rim * uNight;
 
   col += scatter * 0.3;
+
+  // Splash foam
+  float splashFoam = uSplashStrength * exp(-vSplashDist * vSplashDist * 1.5);
+  vec3 foamCol = mix(vec3(0.7, 0.75, 0.8), vec3(0.3, 0.35, 0.4), uNight);
+  col = mix(col, foamCol, clamp(splashFoam * 0.6, 0.0, 1.0));
 
   float dist = length(vWorldPos - uCamPos);
   float fog = 1.0 - exp(-0.00015 * dist * dist);
