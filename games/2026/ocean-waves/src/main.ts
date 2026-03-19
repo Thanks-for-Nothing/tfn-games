@@ -62,7 +62,6 @@ window.addEventListener('resize', () => {
 
 // --- Horizontal look-around ---
 let yaw = 0; // radians, 0 = looking forward (-Z)
-const MAX_YAW = Math.PI * 0.45; // ~80 degrees each way
 const SENSITIVITY = 0.003;
 
 let dragging = false;
@@ -78,7 +77,7 @@ renderer.domElement.addEventListener('pointermove', (e) => {
   if (!dragging) return;
   const dx = e.clientX - lastPointerX;
   lastPointerX = e.clientX;
-  yaw = Math.max(-MAX_YAW, Math.min(MAX_YAW, yaw - dx * SENSITIVITY));
+  yaw -= dx * SENSITIVITY;
 });
 
 renderer.domElement.addEventListener('pointerup', (e) => {
