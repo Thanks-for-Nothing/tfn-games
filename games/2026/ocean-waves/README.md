@@ -26,7 +26,7 @@ index.html     — Entry point, meta tags, minimal CSS
 The scene has three main layers:
 1. **Sky dome** — `SphereGeometry(500)` with `BackSide` rendering and `depthWrite: false`, custom fragment shader for gradient, clouds, stars, sun/moon
 2. **Ocean mesh** — `PlaneGeometry(200, 200, 256, 256)` rotated horizontal, custom vertex shader displaces Y with Gerstner waves + splash, custom fragment shader handles water lighting
-3. **Dolphin mesh** — Procedural Three.js geometry (`CapsuleGeometry` + `ConeGeometry` + `SphereGeometry`), `MeshStandardMaterial`, animated on a parabolic jump arc
+3. **Dolphin mesh** — GLB model (`public/dolphin.glb`, loaded via `GLTFLoader`), `MeshPhongMaterial`, animated on a parabolic jump arc
 
 Both sky and ocean meshes follow the camera (`position.copy(camera.position)`) every frame so the scene appears infinite.
 
@@ -185,30 +185,52 @@ camera.lookAt(lookX, 1, lookZ);
 
 ### Dolphin
 
-**Mesh:** Built from Three.js primitives:
-- Body: `CapsuleGeometry(0.3, 1.8)` aligned along Z axis, slightly flattened vertically with `scale(1, 0.7, 1)`
-- Snout: `SphereGeometry(0.18)` scaled elongated `(1, 0.6, 1.5)`, positioned at the nose
-- Dorsal fin: `ConeGeometry(0.15, 0.4)` tilted back slightly, on top of body
-- Tail flukes: Two `ConeGeometry(0.08, 0.5)` cones, rotated outward and flattened `scale(1, 0.3, 1)`
-- Pectoral fins: Two small `ConeGeometry(0.06, 0.35)` on sides, rotated and flattened
+**Mesh evolution:** Started as procedural Three.js primitives (capsule + cones for fins) but this looked terrible — "a sad weird grey tube with spikes." Replaced with a proper GLB model sourced from a CodePen reference (`https://assets.codepen.io/3685267/dolphin.glb`, 628KB). The GLB is loaded via `GLTFLoader` from `three/examples/jsm/loaders/GLTFLoader.js`.
 
-The current shape is recognizable as a dolphin at distance but looks rough up close — **replacing with a GLB model would be a significant visual upgrade**. The procedural approach was chosen to avoid external asset dependencies.
+**GLB download gotcha:** The CodePen CDN (`assets.codepen.io`) blocks `curl` and programmatic downloads — it returns a Cloudflare challenge HTML page instead of the binary file. The workaround was to fetch the file through a real browser session (using `fetch()` in the browser console) and save it locally.
 
-**Material:** `MeshStandardMaterial` with `color: 0x667788`, `metalness: 0.2`, `roughness: 0.3`, and critically `side: THREE.DoubleSide`. The `DoubleSide` is necessary because the fin and fluke geometries are very thin/flat — without it, they're invisible from one direction. The material requires scene lights to render (`AmbientLight` + `DirectionalLight` were added to the scene specifically for this).
+**Model orientation (CRITICAL — do not change):** The GLB model's native orientation has the body along the Y axis. To get it facing the correct direction in our scene:
+```typescript
+geometry.rotateZ(-Math.PI / 2);  // Body: Y-axis → Z-axis, dorsal fin up
+geometry.rotateY(Math.PI);        // Flip nose from +Z to -Z (our forward direction)
+```
+And the runtime rotation during jumps:
+```typescript
+const pitch = Math.atan2(dydt, jump.speed);  // positive, NOT negated
+dolphinMesh.rotation.order = 'YXZ';
+dolphinMesh.rotation.set(pitch, jump.direction, 0);  // NO + Math.PI on yaw
+```
+**WARNING:** This exact combination was arrived at through extensive trial and error. Changing any sign, adding `Math.PI`, or swapping the geometry rotation order will break the orientation. The nose leads the jump arc, the dorsal fin points up, and the dolphin faces away from the camera during forward travel.
+
+**Model scaling:** The GLB is 37.55 units long natively. It's auto-scaled to a target length of 6 units: `scale = 6.0 / maxDimension`.
+
+**Material:** `MeshPhongMaterial` with `color: 0x7799aa`, `specular: 0xaaccdd`, `shininess: 80`, `emissive: 0x223344` at 0.15 intensity. The emissive prevents the dolphin from being a pure black silhouette when backlit against the sky. The GLB's original material was too dark without an environment map (which the CodePen generates via `PMREMGenerator.fromScene(sky)` — we don't have that). `MeshPhongMaterial` responds better to our directional + hemisphere lights than `MeshStandardMaterial` does without an env map.
+
+**Scene lighting for dolphin:** Three lights:
+- `AmbientLight(0x8899aa, 0.8)` — baseline fill
+- `HemisphereLight(0x88aacc, 0x445566, 0.6)` — sky/ground color gradient
+- `DirectionalLight(0xffeedd, 1.5)` — sun direction, shared with ocean
+- `DirectionalLight(0xaabbcc, 0.8)` — fill light from front/above so dolphin isn't silhouetted
 
 **Jump animation:**
-- **Parabolic Y:** `height * 4 * phase * (1 - phase)` — this formula gives a smooth parabola that's 0 at phase=0 and phase=1, with peak value = `height` at phase=0.5
-- **XZ travel:** Linear movement along a random direction angle
-- **Camera tracking:** This was the trickiest part. The camera moves forward at `CAM_SPEED = 1.5` units/second. If the dolphin just moved from its spawn point, it would quickly fall behind the camera and disappear. The fix: `camDrift = -CAM_SPEED * elapsed` is added to the dolphin's Z position, so it drifts forward at exactly the same rate as the camera.
-- **Pitch rotation:** `Math.atan2(dydt, speed)` where `dydt = height * 4 * (1 - 2*phase)`. This is the derivative of the Y parabola, giving the instantaneous slope. `atan2` converts that slope into a rotation angle so the dolphin's nose follows the arc.
-- **Random spawn:** 12-25 units ahead of camera (negative Z direction), ±20 units lateral (X) offset. Duration 2-3 seconds, height 3-5 units, speed 2-3.5 units/sec.
-- **Random timing:** 5-15 seconds between jumps
+- **Parabolic Y:** `height * 4 * phase * (1 - phase)` — smooth parabola, 0 at phase 0 and 1, peak at phase 0.5. Phase extends past 1.0 (to ~1.4 + 1s) so the Y goes negative and the dolphin submerges fully before disappearing.
+- **Shallow arc:** Height 0.8-1.6 units, speed 6-9 units/sec, duration 0.9-1.3s. The high speed:height ratio gives a realistic shallow arc, not a steep vertical leap.
+- **Pitch clamping:** Raw pitch from `atan2(dydt, speed)` is clamped to ±0.6 radians (~35°) for a natural look. Without clamping, the pitch was too steep at entry/exit.
+- **Lateral travel:** Dolphins jump left-to-right (or right-to-left) across the camera view, NOT toward/away. `jump.direction` is set near ±PI/2 so `sin(direction)` ≈ 1 (full X travel), `cos(direction)` ≈ 0 (minimal Z travel). Both dx and dz are negated to correct for the model's facing direction.
+- **Camera tracking:** `camDrift = -CAM_SPEED * elapsed` is added to Z so the dolphin drifts forward with the camera and doesn't fall behind.
+- **Submersion:** Phase extends to `1.4 + (1.0 / duration)` — the extra 1.4 phase takes Y negative (below water), plus 1 second of linger time so the dolphin is fully submerged before `visible = false`.
+- **Random spawn:** 40-70 units ahead of camera, ±15 units lateral. 5-15 seconds between jumps.
+
+**Day/night dolphin adaptation:** The dolphin material color, specular, and emissive are lerped each frame based on `nightLerp`:
+- Day: color `0xaabbcc` (light grey-blue), specular `0x99aabb`, emissive `0x223344` at 0.1
+- Night: color `0x334455` (dark blue-grey), specular `0x445566`, emissive `0x112233` at 0.25
+- Fill light and hemisphere light also dim at night
 
 **Splash effect:** Two shader-side effects driven by JS-computed uniforms:
-1. **Vertex displacement** (`uSplashPos`, `uSplashStrength` in ocean vertex shader): Water mounds up near the dolphin using gaussian `exp(-dist² * 0.8)`, plus expanding ripple rings using `sin(dist * 8 - time * 12) * exp(-dist² * 0.3)`. The ripple term creates circular waves that expand outward from the splash point.
+1. **Vertex displacement** (`uSplashPos`, `uSplashStrength` in ocean vertex shader): Broad gentle mound using `0.025 * exp(-dist² * 0.4)`, plus soft ripple rings using `0.01 * sin(dist * 6 - time * 10) * exp(-dist² * 0.3)`. The wide gaussian falloff (0.4) prevents a pointy spike — earlier iterations used tighter falloff (2.0) which created a skyscraper-shaped splash.
 2. **Foam** (ocean fragment shader): White/grey foam mixed into water color using `exp(-dist² * 1.5)`. Color adapts to day/night.
 
-Splash strength is driven by dolphin proximity to water surface: `max(0, 1 - y * 0.5)²`. This means full splash when the dolphin is at/below Y=0, diminishing as it rises, and zero when it's more than 2 units above water.
+**Splash decay (important):** The splash strength doesn't cut off abruptly — it uses a per-frame decay: `strength *= max(0, 1 - dt * 3.0)`, which gives ~1 second fade-out. The splash position is NOT reset when the jump ends (earlier versions set it to -9999 which killed the splash instantly). Instead the strength decays naturally to zero while the position stays in place.
 
 The splash position uniform is in **ocean-mesh-local coordinates** (relative to `ocean.position`), not world coordinates, because the ocean mesh moves with the camera.
 
@@ -317,7 +339,7 @@ npm run dev
 
 ## Future Improvements
 
-- **Dolphin GLB model** — Replace procedural geometry with a proper 3D model for realistic dolphin shape. The current capsule+cones approach looks like "a sad weird grey tube with spikes" up close.
+- **Dolphin environment map** — Generate a PMREMGenerator env map from the sky scene (like the CodePen reference does) so the dolphin's material can use the GLB's original PBR textures with proper reflections instead of the current flat Phong material.
 - **Multiple dolphins** — Pod of 2-3 jumping together
 - **Sound** — Ocean ambient, splash sounds, whale song at night
 - **Underwater view** — Tilt camera below water surface for a different perspective

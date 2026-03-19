@@ -127,9 +127,9 @@ void main() {
   // Splash displacement near dolphin
   vec2 splashDelta = position.xz - uSplashPos.xz;
   float sDist = length(splashDelta);
-  float splash = uSplashStrength * exp(-sDist * sDist * 0.8);
+  float splash = uSplashStrength * 0.025 * exp(-sDist * sDist * 0.4);
   // Ripple ring
-  splash += uSplashStrength * 0.3 * sin(sDist * 8.0 - uTime * 12.0) * exp(-sDist * sDist * 0.3);
+  splash += uSplashStrength * 0.01 * sin(sDist * 6.0 - uTime * 10.0) * exp(-sDist * sDist * 0.3);
   displacement.y += splash;
   vSplashDist = sDist;
 

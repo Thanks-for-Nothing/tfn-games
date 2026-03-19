@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
 import {
   skyVertexShader,
   skyFragmentShader,
@@ -18,9 +19,15 @@ const scene = new THREE.Scene();
 // Lights for dolphin mesh
 const ambientLight = new THREE.AmbientLight(0x8899aa, 0.8);
 scene.add(ambientLight);
+const hemiLight = new THREE.HemisphereLight(0x88aacc, 0x445566, 0.6);
+scene.add(hemiLight);
 const dirLight = new THREE.DirectionalLight(0xffeedd, 1.5);
 dirLight.position.set(-0.5, 0.35, -1.0);
 scene.add(dirLight);
+// Second light from front/above so dolphin isn't silhouetted against sky
+const fillLight = new THREE.DirectionalLight(0xaabbcc, 0.8);
+fillLight.position.set(0, 1, 1);
+scene.add(fillLight);
 
 const sunDirDay = new THREE.Vector3(-0.5, 0.35, -1.0).normalize();
 const sunDirNight = new THREE.Vector3(0.3, 0.25, 0.8).normalize();
@@ -63,64 +70,71 @@ const oceanMat = new THREE.ShaderMaterial({
 const ocean = new THREE.Mesh(geo, oceanMat);
 scene.add(ocean);
 
-// --- Procedural dolphin ---
-function createDolphin(): THREE.Group {
-  const group = new THREE.Group();
-  const mat = new THREE.MeshStandardMaterial({
-    color: 0x667788,
-    metalness: 0.2,
-    roughness: 0.3,
-    side: THREE.DoubleSide,
-  });
+// --- GLB Dolphin ---
+let dolphinTemplate: THREE.Mesh | null = null;
+let dolphinMat: THREE.MeshPhongMaterial | null = null;
+const dolphinMesh = new THREE.Group();
+dolphinMesh.visible = false;
+scene.add(dolphinMesh);
 
-  // Body — capsule aligned along Z (nose = +Z, tail = -Z)
-  const bodyGeo = new THREE.CapsuleGeometry(0.3, 1.8, 8, 16);
-  bodyGeo.rotateX(Math.PI / 2);
-  bodyGeo.scale(1.0, 0.7, 1.0);
-  group.add(new THREE.Mesh(bodyGeo, mat));
+const BASE_PATH = import.meta.env.BASE_URL || '/';
 
-  // Snout
-  const snoutGeo = new THREE.SphereGeometry(0.18, 8, 8);
-  snoutGeo.scale(1.0, 0.6, 1.5);
-  const snout = new THREE.Mesh(snoutGeo, mat);
-  snout.position.set(0, -0.02, 1.1);
-  group.add(snout);
+const loader = new GLTFLoader();
+loader.load(
+  `${BASE_PATH}dolphin.glb`,
+  (gltf) => {
+    const mesh = gltf.scene.children[0] as THREE.Mesh;
+    dolphinTemplate = mesh;
 
-  // Dorsal fin
-  const finGeo = new THREE.ConeGeometry(0.15, 0.4, 4);
-  finGeo.rotateX(-0.3);
-  const fin = new THREE.Mesh(finGeo, mat);
-  fin.position.set(0, 0.3, -0.1);
-  group.add(fin);
+    // Measure the model to set correct scale
+    const box = new THREE.Box3().setFromObject(gltf.scene);
+    const size = new THREE.Vector3();
+    box.getSize(size);
+    console.log('Dolphin GLB bounds:', size.x.toFixed(2), size.y.toFixed(2), size.z.toFixed(2));
 
-  // Tail flukes
-  for (const side of [-1, 1]) {
-    const tailGeo = new THREE.ConeGeometry(0.08, 0.5, 4);
-    tailGeo.rotateZ(side * 1.2);
-    tailGeo.rotateX(0.2);
-    const tail = new THREE.Mesh(tailGeo, mat);
-    tail.position.set(side * 0.2, 0.05, -1.2);
-    tail.scale.set(1, 0.3, 1);
-    group.add(tail);
+    // Clone and setup material
+    const dolphinClone = mesh.clone();
+    dolphinClone.geometry = mesh.geometry.clone();
+
+    dolphinClone.geometry.rotateZ(-Math.PI / 2);
+    dolphinClone.geometry.rotateY(Math.PI);
+
+    // Bright dolphin material that catches light from all angles
+    dolphinMat = new THREE.MeshPhongMaterial({
+      color: 0x7799aa,
+      specular: 0x99aabb,
+      shininess: 60,
+      side: THREE.DoubleSide,
+      emissive: 0x223344,
+      emissiveIntensity: 0.1,
+    });
+    dolphinClone.material = dolphinMat;
+    dolphinMesh.add(dolphinClone);
+
+    // Scale so the dolphin is ~6 units long (nose to tail) — visible at distance
+    const maxDim = Math.max(size.x, size.y, size.z);
+    const targetLength = 12.0;
+    const s = targetLength / maxDim;
+    dolphinMesh.scale.set(s, s, s);
+
+    console.log('Dolphin GLB loaded successfully');
+  },
+  undefined,
+  (err) => {
+    console.warn('Failed to load dolphin GLB, using fallback', err);
+    // Fallback: simple elongated sphere
+    const fallbackGeo = new THREE.SphereGeometry(0.4, 12, 8);
+    fallbackGeo.scale(1.0, 0.6, 2.5);
+    const fallbackMat = new THREE.MeshStandardMaterial({
+      color: 0x556677,
+      metalness: 0.15,
+      roughness: 0.4,
+      side: THREE.DoubleSide,
+    });
+    dolphinMesh.add(new THREE.Mesh(fallbackGeo, fallbackMat));
+    dolphinMesh.scale.set(3.5, 3.5, 3.5);
   }
-
-  // Pectoral fins
-  for (const side of [-1, 1]) {
-    const pecGeo = new THREE.ConeGeometry(0.06, 0.35, 4);
-    pecGeo.rotateZ(side * 1.5);
-    const pec = new THREE.Mesh(pecGeo, mat);
-    pec.position.set(side * 0.28, -0.1, 0.3);
-    pec.scale.set(1, 0.3, 1);
-    group.add(pec);
-  }
-
-  group.scale.set(1.5, 1.5, 1.5);
-  return group;
-}
-
-const dolphin = createDolphin();
-dolphin.visible = false;
-scene.add(dolphin);
+);
 
 // --- Dolphin jump state ---
 const CAM_SPEED = 1.5;
@@ -155,13 +169,15 @@ function startJump(camX: number, camZ: number, t: number) {
   jump.active = true;
   jump.phase = 0;
   jump.startTime = t;
-  jump.duration = 2.0 + Math.random() * 1.0;
-  jump.height = 3 + Math.random() * 2;
-  jump.speed = 2 + Math.random() * 1.5;
-  jump.direction = (Math.random() - 0.5) * 0.4;
-  // Place 12-25 units ahead of camera
-  jump.originZ = camZ - 12 - Math.random() * 13;
-  jump.originX = camX + (Math.random() - 0.5) * 20;
+  jump.duration = 0.9 + Math.random() * 0.4;
+  jump.height = 0.8 + Math.random() * 0.8;  // shallow arc: 0.8-1.6 units
+  jump.speed = 6 + Math.random() * 3;        // much faster forward: 6-9 units/sec
+  // Direction: roughly left-to-right (perpendicular to camera view)
+  // Random side: +X or -X, with slight variation
+  jump.direction = (Math.random() > 0.5 ? 1 : -1) * (1.2 + Math.random() * 0.6);
+  // Place ahead of camera in Z, centered or slightly offset in X
+  jump.originZ = camZ - 40 - Math.random() * 30;
+  jump.originX = camX + (Math.random() - 0.5) * 15;
 }
 
 // Camera
@@ -259,7 +275,23 @@ function animate() {
   dirLight.position.copy(currentSunDir);
   dirLight.intensity = 1.5 - nightLerp * 1.0;
   ambientLight.intensity = 0.8 - nightLerp * 0.4;
+  hemiLight.intensity = 0.6 - nightLerp * 0.4;
+  fillLight.intensity = 0.8 - nightLerp * 0.5;
   renderer.toneMappingExposure = 0.6 + nightLerp * 0.15;
+
+  // Update dolphin material to match lighting environment
+  if (dolphinMat) {
+    const dayColor = new THREE.Color(0xaabbcc);
+    const nightColor = new THREE.Color(0x334455);
+    dolphinMat.color.copy(dayColor).lerp(nightColor, nightLerp);
+    const daySpec = new THREE.Color(0x99aabb);
+    const nightSpec = new THREE.Color(0x445566);
+    dolphinMat.specular.copy(daySpec).lerp(nightSpec, nightLerp);
+    const dayEmissive = new THREE.Color(0x223344);
+    const nightEmissive = new THREE.Color(0x112233);
+    dolphinMat.emissive.copy(dayEmissive).lerp(nightEmissive, nightLerp);
+    dolphinMat.emissiveIntensity = 0.1 + nightLerp * 0.15;
+  }
 
   oceanMat.uniforms.uCamPos.value.copy(camera.position);
 
@@ -280,44 +312,51 @@ function animate() {
     startJump(camera.position.x, camera.position.z, t);
   }
 
-  let currentSplashStrength = 0;
+  let currentSplashStrength = oceanMat.uniforms.uSplashStrength.value as number;
+  // Decay splash smoothly — takes ~1 second to fully fade
+  currentSplashStrength *= Math.max(0, 1 - dt * 3.0);
 
   if (jump.active) {
     jump.phase += dt / jump.duration;
 
-    if (jump.phase >= 1) {
+    // Let phase go well past 1.0 so dolphin fully submerges + lingers 1s underwater
+    if (jump.phase >= 1.4 + (1.0 / jump.duration)) {
       jump.active = false;
-      dolphin.visible = false;
+      dolphinMesh.visible = false;
       jump.nextJumpAt = t + 5 + Math.random() * 10;
-      splashPos.set(0, 0, -9999);
+      // Don't reset splashPos — let the decay handle fade-out
     } else {
-      dolphin.visible = true;
+      dolphinMesh.visible = true;
       const p = jump.phase;
 
-      // Parabolic Y: 0 at start/end, peak at p=0.5
+      // Parabolic Y: 0 at p=0 and p=1, negative past p=1 (submerging)
       const y = jump.height * 4 * p * (1 - p);
 
-      // XZ travel + move with camera so it stays in view
+      // XZ travel — mainly lateral (left to right)
       const elapsed = t - jump.startTime;
       const travelDist = jump.speed * jump.duration;
-      const dx = Math.sin(jump.direction) * travelDist * p;
-      const dz = -travelDist * p;
+      const dx = -Math.sin(jump.direction) * travelDist * p;
+      const dz = -Math.cos(jump.direction) * travelDist * p;
       // Also drift with camera so dolphin doesn't fall behind
       const camDrift = -CAM_SPEED * elapsed;
 
       const worldX = jump.originX + dx;
       const worldZ = jump.originZ + dz + camDrift;
 
-      dolphin.position.set(worldX, y, worldZ);
+      dolphinMesh.position.set(worldX, y, worldZ);
 
-      // Pitch follows arc tangent
       const dydt = jump.height * 4 * (1 - 2 * p);
-      const pitch = Math.atan2(dydt, jump.speed);
-      dolphin.rotation.set(pitch, jump.direction + Math.PI, 0);
+      // Clamp pitch to ±35° for a natural shallow arc
+      const rawPitch = Math.atan2(dydt, jump.speed);
+      const maxPitch = 0.6; // ~35 degrees
+      const pitch = Math.max(-maxPitch, Math.min(maxPitch, rawPitch));
+      dolphinMesh.rotation.order = 'YXZ';
+      dolphinMesh.rotation.set(pitch, jump.direction, 0);
 
-      // Splash strength: peaks when near water surface
+      // Splash strength: boost when near water, otherwise let decay handle it
       const splashY = Math.max(0, 1 - y * 0.5);
-      currentSplashStrength = splashY * splashY * 1.5;
+      const targetSplash = splashY * splashY * 1.5;
+      currentSplashStrength = Math.max(currentSplashStrength, targetSplash);
 
       // Splash position relative to ocean mesh center
       splashPos.set(worldX - ocean.position.x, 0, worldZ - ocean.position.z);
