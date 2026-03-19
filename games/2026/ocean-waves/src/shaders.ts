@@ -65,8 +65,8 @@ void main() {
   if (rd.y > 0.02) {
     float theta = acos(rd.y);
     float phi = atan(rd.z, rd.x);
-    vec2 starUV = floor(vec2(phi * 100.0, theta * 100.0));
-    float star = step(0.996, hash(starUV));
+    vec2 starUV = floor(vec2(phi * 400.0, theta * 400.0));
+    float star = step(0.998, hash(starUV));
     float twinkle = 0.7 + 0.3 * sin(uTime * 2.0 + hash(starUV * 0.5) * 6.28);
     float brightness = hash(starUV * 1.7) * 0.5 + 0.5;
     col += vec3(star * twinkle * brightness) * uNight * smoothstep(0.02, 0.15, rd.y);
