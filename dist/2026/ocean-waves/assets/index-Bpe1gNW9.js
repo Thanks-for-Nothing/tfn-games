@@ -3892,8 +3892,8 @@ void main() {
     vec3 starDir = normalize(rd) * 500.0;
     vec3 starCell = floor(starDir);
     float h = fract(sin(dot(starCell, vec3(127.1, 311.7, 74.7))) * 43758.5453);
-    float isStar = step(0.985, h);
-    float twinkle = 0.7 + 0.3 * sin(uTime * 1.5 + h * 100.0);
+    float isStar = step(0.9925, h);
+    float twinkle = 0.75 + 0.25 * sin(uTime * (0.5 + h * 3.0) + h * 627.3);
     float brightness = fract(h * 17.3) * 0.6 + 0.4;
     col += vec3(isStar * twinkle * brightness) * uNight * smoothstep(0.01, 0.1, rd.y);
   }
