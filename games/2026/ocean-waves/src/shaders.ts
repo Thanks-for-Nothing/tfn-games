@@ -8,15 +8,81 @@ void main() {
 
 export const skyFragmentShader = `
 uniform vec3 uSunDir;
+uniform float uNight;
+uniform float uTime;
 varying vec3 vWorldDir;
+
+float hash(vec2 p) {
+  return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453);
+}
+
+float noise(vec2 p) {
+  vec2 i = floor(p);
+  vec2 f = fract(p);
+  f = f * f * (3.0 - 2.0 * f);
+  float a = hash(i);
+  float b = hash(i + vec2(1.0, 0.0));
+  float c = hash(i + vec2(0.0, 1.0));
+  float d = hash(i + vec2(1.0, 1.0));
+  return mix(mix(a, b, f.x), mix(c, d, f.x), f.y);
+}
+
+float fbm(vec2 p) {
+  float v = 0.0;
+  float a = 0.5;
+  for (int i = 0; i < 4; i++) {
+    v += a * noise(p);
+    p *= 2.0;
+    a *= 0.5;
+  }
+  return v;
+}
+
 void main() {
   vec3 rd = normalize(vWorldDir);
   float t = max(rd.y, 0.0);
-  vec3 col = mix(vec3(0.55, 0.7, 0.85), vec3(0.05, 0.15, 0.4), pow(t, 0.5));
+
+  // Day sky gradient
+  vec3 dayCol = mix(vec3(0.55, 0.7, 0.85), vec3(0.05, 0.15, 0.4), pow(t, 0.5));
+  // Night sky gradient
+  vec3 nightCol = mix(vec3(0.03, 0.04, 0.1), vec3(0.01, 0.01, 0.04), pow(t, 0.3));
+  vec3 col = mix(dayCol, nightCol, uNight);
+
+  // Sun (day)
   float sun = clamp(dot(rd, uSunDir), 0.0, 1.0);
-  col += vec3(1.0, 0.9, 0.7) * pow(sun, 256.0) * 1.5;
-  col += vec3(1.0, 0.9, 0.7) * pow(sun, 8.0) * 0.15;
-  col += vec3(0.4, 0.25, 0.1) * pow(sun, 3.0) * smoothstep(-0.02, 0.1, rd.y) * 0.3;
+  float dayFactor = 1.0 - uNight;
+  col += vec3(1.0, 0.9, 0.7) * pow(sun, 256.0) * 1.5 * dayFactor;
+  col += vec3(1.0, 0.9, 0.7) * pow(sun, 8.0) * 0.15 * dayFactor;
+  col += vec3(0.4, 0.25, 0.1) * pow(sun, 3.0) * smoothstep(-0.02, 0.1, rd.y) * 0.3 * dayFactor;
+
+  // Moon (night)
+  float moon = clamp(dot(rd, uSunDir), 0.0, 1.0);
+  col += vec3(0.9, 0.92, 1.0) * pow(moon, 400.0) * 2.0 * uNight;
+  col += vec3(0.2, 0.25, 0.4) * pow(moon, 6.0) * 0.2 * uNight;
+
+  // Stars (night only)
+  if (rd.y > 0.02) {
+    vec2 starUV = floor(rd.xz / max(rd.y, 0.01) * 300.0);
+    float star = step(0.996, hash(starUV));
+    float twinkle = 0.7 + 0.3 * sin(uTime * 2.0 + hash(starUV * 0.5) * 6.28);
+    float brightness = hash(starUV * 1.7) * 0.5 + 0.5;
+    col += vec3(star * twinkle * brightness) * uNight * smoothstep(0.02, 0.15, rd.y);
+  }
+
+  // Clouds
+  if (rd.y > 0.0) {
+    vec2 cloudUV = rd.xz / (rd.y + 0.1) * 0.3;
+    cloudUV += uTime * 0.008;
+    float cloud = fbm(cloudUV * 3.0);
+    cloud = smoothstep(0.35, 0.65, cloud);
+    cloud *= smoothstep(0.0, 0.15, rd.y);
+
+    vec3 dayCloud = vec3(0.95, 0.95, 0.97);
+    vec3 nightCloud = vec3(0.08, 0.08, 0.14);
+    vec3 cloudCol = mix(dayCloud, nightCloud, uNight);
+    col = mix(col, cloudCol, cloud * 0.55);
+  }
+
   gl_FragColor = vec4(col, 1.0);
 }`;
 
@@ -67,14 +133,22 @@ void main() {
 export const oceanFragmentShader = `
 uniform vec3 uSunDir;
 uniform vec3 uCamPos;
+uniform float uNight;
 varying vec3 vWorldPos;
 varying vec3 vNormal;
+
 vec3 sky(vec3 rd) {
   float t = max(rd.y, 0.0);
-  vec3 col = mix(vec3(0.55, 0.7, 0.85), vec3(0.05, 0.15, 0.4), pow(t, 0.5));
+  vec3 dayCol = mix(vec3(0.55, 0.7, 0.85), vec3(0.05, 0.15, 0.4), pow(t, 0.5));
+  vec3 nightCol = mix(vec3(0.03, 0.04, 0.1), vec3(0.01, 0.01, 0.04), pow(t, 0.3));
+  vec3 col = mix(dayCol, nightCol, uNight);
+
   float sun = clamp(dot(rd, uSunDir), 0.0, 1.0);
-  col += vec3(1.0, 0.9, 0.7) * pow(sun, 256.0) * 1.5;
-  col += vec3(1.0, 0.9, 0.7) * pow(sun, 8.0) * 0.15;
+  float dayFactor = 1.0 - uNight;
+  col += vec3(1.0, 0.9, 0.7) * pow(sun, 256.0) * 1.5 * dayFactor;
+  col += vec3(1.0, 0.9, 0.7) * pow(sun, 8.0) * 0.15 * dayFactor;
+  col += vec3(0.8, 0.85, 0.95) * pow(sun, 512.0) * 1.2 * uNight;
+  col += vec3(0.3, 0.35, 0.5) * pow(sun, 12.0) * 0.1 * uNight;
   return col;
 }
 
@@ -89,11 +163,20 @@ void main() {
   vec3 reflColor = sky(R);
   float spec = pow(max(dot(R, uSunDir), 0.0), 256.0);
   float sss = pow(max(dot(-V, uSunDir), 0.0), 3.0) * max(N.y, 0.0);
-  vec3 scatter = vec3(0.0, 0.15, 0.12) * sss;
-  vec3 waterCol = vec3(0.0, 0.04, 0.12) + scatter * 0.8;
+
+  vec3 dayScatter = vec3(0.0, 0.15, 0.12);
+  vec3 nightScatter = vec3(0.0, 0.04, 0.06);
+  vec3 scatter = mix(dayScatter, nightScatter, uNight) * sss;
+
+  vec3 dayWater = vec3(0.0, 0.04, 0.12);
+  vec3 nightWater = vec3(0.0, 0.01, 0.03);
+  vec3 waterCol = mix(dayWater, nightWater, uNight) + scatter * 0.8;
 
   vec3 col = mix(waterCol, reflColor, fresnel);
-  col += vec3(1.0, 0.9, 0.7) * spec * 2.0;
+
+  vec3 daySpec = vec3(1.0, 0.9, 0.7);
+  vec3 nightSpec = vec3(0.6, 0.65, 0.8);
+  col += mix(daySpec, nightSpec, uNight) * spec * 2.0;
   col += scatter * 0.3;
 
   float dist = length(vWorldPos - uCamPos);
