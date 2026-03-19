@@ -4,9 +4,10 @@
   "version": "1.0.0",
   "scripts": {
     "build": "npm run build:active",
-    "build:active": "npm run build:2026-cannon-fire && npm run build:2026-flags",
+    "build:active": "npm run build:2026-cannon-fire && npm run build:2026-flags && npm run build:2026-ocean-waves",
     "build:2026-cannon-fire": "cd games/2026/cannon-fire && npm install && npm run build",
     "build:2026-flags": "cd games/2026/flags && npm install && npm run build",
+    "build:2026-ocean-waves": "cd games/2026/ocean-waves && npm install && npm run build",
     "freeze:2026-cannon-fire": "cd games/2026/cannon-fire && npm install && npm run build && echo 'Now commit dist/2026/cannon-fire/ and remove this game from build:active'",
     "freeze:2026-flags": "cd games/2026/flags && npm install && npm run build && echo 'Now commit dist/2026/flags/ and remove this game from build:active'"
   }

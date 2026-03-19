@@ -3,6 +3,7 @@
   "outputDirectory": "dist",
   "rewrites": [
     { "source": "/2026/cannon-fire/(.*)", "destination": "/2026/cannon-fire/index.html" },
-    { "source": "/2026/flags/(.*)", "destination": "/2026/flags/index.html" }
+    { "source": "/2026/flags/(.*)", "destination": "/2026/flags/index.html" },
+    { "source": "/2026/ocean-waves/(.*)", "destination": "/2026/ocean-waves/index.html" }
   ]
 }
