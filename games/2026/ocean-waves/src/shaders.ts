@@ -40,7 +40,8 @@ float fbm(vec2 p) {
 
 void main() {
   vec3 rd = normalize(vWorldDir);
-  float t = max(rd.y, 0.0);
+  // Allow sky gradient to continue slightly below horizon
+  float t = max(rd.y + 0.05, 0.0);
 
   // Day sky gradient
   vec3 dayCol = mix(vec3(0.55, 0.7, 0.85), vec3(0.05, 0.15, 0.4), pow(t, 0.5));
@@ -53,29 +54,32 @@ void main() {
   float dayFactor = 1.0 - uNight;
   col += vec3(1.0, 0.9, 0.7) * pow(sun, 256.0) * 1.5 * dayFactor;
   col += vec3(1.0, 0.9, 0.7) * pow(sun, 8.0) * 0.15 * dayFactor;
-  col += vec3(0.4, 0.25, 0.1) * pow(sun, 3.0) * smoothstep(-0.02, 0.1, rd.y) * 0.3 * dayFactor;
+  col += vec3(0.4, 0.25, 0.1) * pow(sun, 3.0) * smoothstep(-0.05, 0.1, rd.y) * 0.3 * dayFactor;
 
   // Moon (night)
   float moon = clamp(dot(rd, uSunDir), 0.0, 1.0);
   col += vec3(0.9, 0.92, 1.0) * pow(moon, 400.0) * 2.0 * uNight;
   col += vec3(0.2, 0.25, 0.4) * pow(moon, 6.0) * 0.2 * uNight;
 
-  // Stars (night only)
+  // Stars (night only) — use spherical coords for stable positions
   if (rd.y > 0.02) {
-    vec2 starUV = floor(rd.xz / max(rd.y, 0.01) * 300.0);
+    float theta = acos(rd.y);
+    float phi = atan(rd.z, rd.x);
+    vec2 starUV = floor(vec2(phi * 100.0, theta * 100.0));
     float star = step(0.996, hash(starUV));
     float twinkle = 0.7 + 0.3 * sin(uTime * 2.0 + hash(starUV * 0.5) * 6.28);
     float brightness = hash(starUV * 1.7) * 0.5 + 0.5;
     col += vec3(star * twinkle * brightness) * uNight * smoothstep(0.02, 0.15, rd.y);
   }
 
-  // Clouds
-  if (rd.y > 0.0) {
-    vec2 cloudUV = rd.xz / (rd.y + 0.1) * 0.3;
+  // Clouds — extend slightly below horizon
+  if (rd.y > -0.05) {
+    float cH = max(rd.y, 0.001);
+    vec2 cloudUV = rd.xz / (cH + 0.1) * 0.3;
     cloudUV += uTime * 0.008;
     float cloud = fbm(cloudUV * 3.0);
     cloud = smoothstep(0.35, 0.65, cloud);
-    cloud *= smoothstep(0.0, 0.15, rd.y);
+    cloud *= smoothstep(-0.05, 0.15, rd.y);
 
     vec3 dayCloud = vec3(0.95, 0.95, 0.97);
     vec3 nightCloud = vec3(0.08, 0.08, 0.14);
@@ -161,7 +165,13 @@ void main() {
   fresnel = mix(0.04, 1.0, fresnel);
 
   vec3 reflColor = sky(R);
-  float spec = pow(max(dot(R, uSunDir), 0.0), 256.0);
+
+  // Day: tight sun specular. Night: wider moon path + tight highlight
+  float daySpec = pow(max(dot(R, uSunDir), 0.0), 256.0);
+  float nightSpecTight = pow(max(dot(R, uSunDir), 0.0), 200.0);
+  float nightSpecWide = pow(max(dot(R, uSunDir), 0.0), 30.0);
+  float spec = mix(daySpec, nightSpecTight, uNight);
+
   float sss = pow(max(dot(-V, uSunDir), 0.0), 3.0) * max(N.y, 0.0);
 
   vec3 dayScatter = vec3(0.0, 0.15, 0.12);
@@ -174,9 +184,17 @@ void main() {
 
   vec3 col = mix(waterCol, reflColor, fresnel);
 
-  vec3 daySpec = vec3(1.0, 0.9, 0.7);
-  vec3 nightSpec = vec3(0.6, 0.65, 0.8);
-  col += mix(daySpec, nightSpec, uNight) * spec * 2.0;
+  vec3 daySpecCol = vec3(1.0, 0.9, 0.7);
+  vec3 nightSpecCol = vec3(0.7, 0.75, 0.9);
+  col += mix(daySpecCol, nightSpecCol, uNight) * spec * 2.0;
+
+  // Moon path — wide shimmer on water at night
+  col += vec3(0.15, 0.18, 0.25) * nightSpecWide * uNight;
+
+  // Rim lighting at night — catch wave edges
+  float rim = pow(1.0 - max(dot(N, V), 0.0), 3.0);
+  col += vec3(0.06, 0.08, 0.12) * rim * uNight;
+
   col += scatter * 0.3;
 
   float dist = length(vWorldPos - uCamPos);
